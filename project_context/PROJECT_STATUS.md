@@ -2,13 +2,18 @@
 
 ## Current Implementation State (Verified)
 
-### 1. Vision & Anomaly Detection (PaDiM) & Model Registry
+### 1. Vision & Anomaly Detection (PaDiM, Registry & Experimental PatchCore)
 - **Status:** Complete & Verified.
-- **Fitted Models (4 Categories):**
+- **Production Fitted Models (4 Categories):**
   - `data/index/vision/bottle/padim.pkl` (662 MB) — Exists, verified.
   - `data/index/vision/cable/padim.pkl` (662 MB) — Exists, verified.
   - `data/index/vision/metal_nut/padim.pkl` (662 MB) — Exists, verified.
-  - `data/index/vision/screw/padim.pkl` (662 MB) — Exists, newly trained & verified.
+  - `data/index/vision/screw/padim.pkl` (662 MB) — Exists, verified.
+- **Experimental Models & Benchmarking:**
+  - `src/app/vision/patchcore.py`: Experimental PatchCore architecture featuring ResNet-18 layer2+3 patch representations and memory-bank nearest-neighbor scoring.
+  - Empirical comparison documented in `runs/experimental_benchmarks.json`:
+    - On held-out screw evaluation, PatchCore increases specificity from 28.57% (PaDiM) to **47.62%** and reduces FPR from 71.43% to **52.38%** (Pixel AUROC = 0.9709).
+    - Rotation-normalized PaDiM evaluated: in-plane 2D alignment collapsed held-out AUROC to 0.4374 and sensitivity to 1.69% due to border padding, 180° flip ambiguity, and unresolved 3D helical roll angle.
 - **Architecture & Registry:**
   - `src/app/vision/registry.py`: Scalable `ModelRegistry` with dynamic category discovery and thread-safe in-memory `LRUModelCache` (capacity = 3).
   - Lazy loading with automatic LRU eviction bounded at ~2.0 GB active RAM / ~132 MB CUDA VRAM.
@@ -101,11 +106,12 @@
   - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 58 / 58 passing unit tests across all 9 test suites:
+- **Status:** 62 / 62 passing unit tests across all 10 test suites:
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
   - `test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
+  - `test_patchcore.py`: 4 passed (initialization, embedding shapes, fit memory bank, anomaly map, save/load cycle)
   - `test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, and category limitations)
   - `test_vision_validation.py`: 5 passed
   - `test_threshold_calibration.py`: 12 passed (disjoint split verification, certified sample counts, calibrated threshold presence, metric arithmetic, seeded reproducibility)

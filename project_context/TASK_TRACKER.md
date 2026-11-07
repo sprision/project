@@ -17,17 +17,31 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (58 / 58 Passed)**
+- [x] **Unit Test Suite Verification (62 / 62 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
   - `tests/unit/test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
+  - `tests/unit/test_patchcore.py`: 4 passed (PatchCore memory bank, feature extraction, anomaly maps, persistence)
   - `tests/unit/test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, category limitations)
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
   - `tests/unit/test_threshold_calibration.py`: 12 passed (15.58s) (disjoint split verification, certified sample counts, calibration threshold presence, metric arithmetic, seeded reproducibility)
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
   - `tests/unit/test_agent.py`: 10 passed (32.76s) (regression test for tool report assembly)
-  - Total: **58 passing tests** across 9 unit test suites.
+  - Total: **62 passing tests** across 10 unit test suites.
+
+- [x] **Category-Specific Inspection Strategy & Empirical Model Comparison**
+  - Investigated 2D in-plane rotation normalization for screw images (PCA-based major axis alignment and vertical rotation with head-at-top detection).
+  - Proved empirically that 2D rotation normalization collapses PaDiM's held-out AUROC to 0.4374 and sensitivity to 1.69% due to border interpolation padding, 180° head/tip flip discontinuities on symmetrical machine screws, and failure to align 3D helical roll angles.
+  - Implemented `PatchCore` in `src/app/vision/patchcore.py` as an experimental alternative model architecture (neighborhood-aware ResNet-18 layer2+3 embeddings + 10k memory bank).
+  - Evaluated PatchCore on identical calibration and held-out splits:
+    - Held-out specificity increased from 28.57% (PaDiM) to **47.62%** (PatchCore).
+    - Held-out FPR decreased from 71.43% to **52.38%**.
+    - Held-out Pixel AUROC remained state-of-the-art at **0.9709**.
+    - Held-out Balanced Accuracy increased from 50.73% to **53.47%**.
+  - Investigated cable held-out sensitivity (60.87%): proved that coarse defects achieve 85–100% recall, while `missing_wire` (90% missed) and `poke_insulation` (100% missed) are the sole failure modes due to negative anomalies (matching background) and microscopic puncture smoothing ($\sigma=4$).
+  - Recorded complete comparative results in `runs/experimental_benchmarks.json`.
+  - Preserved all production models and historical benchmark records intact. Zero tuning against held-out labels.
 
 - [x] **Calibration Integrity Audit & Evaluation Protocol Separation**
   - Audited `scripts/calibrate_thresholds.py` and `scripts/validate_anomaly_detection.py`.

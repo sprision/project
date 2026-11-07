@@ -2,14 +2,25 @@
 
 ## Known Bugs, Model Limitations & Operational Issues
 
-### 1. `cable` Category Score Overlap (Model Limitation)
+### 1. `cable` Category Score Overlap & Sensitivity Limitations (Detailed Analysis)
 - **Component:** `src/app/vision/model.py` / `data/index/vision/cable/padim.pkl`
-- **Description:** PaDiM anomaly scores for defective and defect-free cable samples exhibit noticeable overlap, yielding an image AUROC of 0.8413 (compared to 1.0000 for bottle and 0.9741 for metal_nut).
-- **Validation Findings (Full 150 Test Images):**
-  - **Clean Samples (58):** 52 correctly classified (TN), 6 false alarms (FP) on twisted/bent cables (`007.png`, `008.png`, `016.png`, `019.png`, `036.png`, `041.png`) scoring 31.42 to 35.80 vs threshold 30.4218. Specificity is 89.66%, FPR is 10.34%.
-  - **Defective Samples (92):** 60 detected (TP), 32 missed (FN). Coarse defects (`cut_outer_insulation`, `bent_wire`, `combined`, `missing_cable`) achieve 85–100% recall. Low-patch-activation defects (`missing_wire` missing 9/10, `poke_insulation` missing 10/10) score between 15.8 and 27.9 due to Gaussian smoothing over small spatial disruptions and missing conductor features matching normal background.
-- **Impact:** Any single threshold produces either false alarms on bent/twisted normal cables or misses subtle insulation cracks/missing wires.
-- **Mitigation:** The system explicitly classifies findings as hypotheses rather than definitive diagnoses and surfaces candidate defect regions for manual human visual inspection.
+- **Description:** PaDiM anomaly scores for defective and defect-free cable samples exhibit noticeable overlap, yielding an image AUROC of 0.8413 (apparent full test) / 0.7961 (strict held-out evaluation), and a held-out sensitivity of **60.87%** (28 detected, 18 missed).
+- **Defect Breakdown & Root Cause Findings (Evaluated Across 150 Test Images):**
+  - **Coarse Surface & Geometry Defects (High Recall):**
+    - `cut_outer_insulation`: 10/10 detected (**100% recall**, mean score 42.14 vs threshold 30.4218)
+    - `missing_cable`: 11/12 detected (**91.7% recall**, mean score 33.55)
+    - `combined`: 10/11 detected (**90.9% recall**, mean score 41.86)
+    - `bent_wire`: 11/13 detected (**84.6% recall**, mean score 42.24)
+    - `cable_swap`: 9/12 detected (**75.0% recall**, mean score 34.02)
+    - `cut_inner_insulation`: 8/14 detected (**57.1% recall**, mean score 33.37)
+  - **Failure Modes Driving Low Sensitivity:**
+    - **`missing_wire` (1/10 detected, 90.0% missed!):** Score range $[15.84, 32.78]$, **mean score = 21.74**.
+      *Root Cause (Negative Anomaly Problem):* When an inner colored wire is missing, the image exposes the plain light-grey background surface. Because cables are flexible, training set cables had slight geometric bend variations, so the background was frequently observed at patch $(i, j)$ during normal training. Uniform background features produce tiny Mahalanobis distances that match the background Gaussian distribution (scoring lower than clean cables: 21.74 vs 22.77).
+    - **`poke_insulation` (0/10 detected, 100.0% missed!):** Score range $[21.22, 27.92]$, **mean score = 24.87**.
+      *Root Cause (Resolution & Gaussian Smoothing):* Punctures are sub-millimeter pinholes in the cable jacket. Layer3 features downsample by $16\times$, and PaDiM's post-processing applies `gaussian_filter(score_map, sigma=4)`. High-frequency microscopic disruptions are diluted by the surrounding black rubber jacket.
+  - **Clean Cable Variance & Threshold Compression:**
+    - Normal twisted cables produce geometric strain scores up to 35.80 (mean 22.77). Setting the threshold at 30.4218 was required during calibration to control false alarms (specificity 89.66%), but this high threshold compresses the decision boundary and guarantees missing low-activation defects.
+- **Mitigation:** The system flags cable inspections as requiring visual verification on conductor counts and surfaces candidate defect regions. For critical cable QA, specialized object-detection models (counting wires) or higher-resolution patch models (e.g., $1024\times 1024$ without Gaussian smoothing) are recommended.
 
 ---
 

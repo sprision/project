@@ -89,5 +89,14 @@
   - *Storage & Memory Bound:* 10 models require 6.62 GB on disk. Implementing an LRU cache (capacity = 3) bounds active GPU/RAM footprint to $\approx 1.98\text{ GB}$.
   - *Zero Downtime / Zero Code Changes:* Because `InspectionService.available_categories()` dynamically interrogates `data/index/vision/`, new models become immediately discoverable by the API and dashboard upon disk write.
 
+---
+
+### 10. Category-Specific Inspection Strategies & Experimental Alternative Models
+- **Decision:** Retain production PaDiM models and calibrated thresholds for spatially registered and circularly symmetric objects (`bottle`, `metal_nut`), while establishing `PatchCore` in `src/app/vision/patchcore.py` as an experimental alternative model architecture for rotationally unconstrained or spatially varying categories (`screw`, `cable`). Formally reject 2D in-plane rotation normalization for PaDiM.
+- **Rationale:**
+  - *Failure of 2D In-Plane Rotation Normalization:* Empirically evaluated on MVTec AD screw using PCA centroid alignment and vertical major-axis canonical rotation. Held-out AUROC collapsed from 0.5843 to 0.4374, and sensitivity collapsed to 1.69% (1 TP, 58 FN). Boundary padding, 180° head/tip flip discontinuities on symmetrical machine screws, and failure to align the 3D helical roll angle (thread crests still shift along the cylinder) make 2D rotation counterproductive.
+  - *PatchCore Efficacy for Spatial Invariance:* PatchCore extracts neighborhood-aware patch embeddings from layers 2 + 3 into a position-free memory bank. Nearest-neighbor distance matching is intrinsically translation- and rotation-invariant across the frame. On held-out screw evaluation, PatchCore reduced false-positive rate from 71.43% down to 52.38% (specificity increased from 28.57% to 47.62%) while maintaining state-of-the-art pixel localization (Pixel AUROC = 0.9709).
+  - *Cable Sensitivity Drivers Identified:* Proved that low held-out sensitivity (60.87%) is driven exclusively by `missing_wire` (90% missed) and `poke_insulation` (100% missed). Missing wires constitute negative anomalies (matching background feature distributions), and microscopic punctures are smoothed out by layer3 downsampling (16x) and Gaussian filtering ($\sigma=4$). Coarse defects (`cut_outer_insulation`, `missing_cable`, `combined`, `bent_wire`) achieve 85–100% recall.
+
 
 

@@ -65,7 +65,10 @@ The system is organized into decoupled layers: a thin HTTP API presentation laye
 ## Component Boundaries & Contracts
 
 ### 1. Vision Layer (`src/app/vision/`)
-- **Key Modules:** `model.py` (`PaDiM`, `AnomalyInspector`, `regions_from_map`, `save_overlay`, `validate_image`, `load_calibrated_threshold`).
+- **Key Modules:**
+  - `model.py` (`PaDiM`, `AnomalyInspector`, `regions_from_map`, `save_overlay`, `validate_image`, `load_calibrated_threshold`). Production model architecture.
+  - `registry.py` (`ModelRegistry`, `LRUModelCache`, `CategoryMetadata`). Manages lazy model loading, bounded RAM/VRAM footprint, and dynamic discovery.
+  - `patchcore.py` (`PatchCore`). Experimental alternative model architecture implementing position-free nearest-neighbor memory banks for rotationally unconstrained or non-rigid industrial categories.
 - **Contract:** Isolates PyTorch, TorchVision, and Timm entirely from the API and agent. Produces a validated Pydantic `VisionResult` including `is_anomalous`, `threshold`, `verdict_mode` (`calibrated_raw` or `normalised`), `image_anomaly_score`, `raw_anomaly_score`, `regions` (list of `DefectRegion`), and `heatmap_path`.
 
 ### 2. Retrieval Layer (`src/app/retrieval/`)

@@ -255,3 +255,45 @@
   - `test_split_sizes_match_certified_protocol`: verifies exact counts in `cal` and `ev` splits.
   - Test Suite: **58 / 58 passed in 39.26s**.
 - **Preservation Check:** All 4 trained PaDiM models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmark files strictly preserved.
+
+---
+
+### Session 9: Category-Specific Strategy, Rotation Normalization & PatchCore Evaluation
+- **Date & Local Time:** 2026-11-07T15:05:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Investigate 2D rotation normalization for screw images without modifying production models.
+  2. Research and implement PatchCore as an experimental alternative model architecture.
+  3. Design a fair comparison using identical calibration and held-out splits (seed 42, 50/50).
+  4. Investigate cable's relatively low held-out sensitivity (60.87%).
+  5. Preserve all historical benchmark files and production models.
+- **Experimental Findings & Measured Comparisons:**
+  1. **Rotation Normalization for Screw:**
+     - Developed PCA-based centroid and major-axis orientation detector with head-at-top alignment.
+     - Fitted PaDiM on 320 rotation-normalized training images and evaluated on identical calibration and held-out splits.
+     - **Result:** Held-out Image AUROC collapsed from 0.5843 to **0.4374**, and Sensitivity collapsed to **1.69%** (1 TP, 58 FN).
+     - **Mechanism:** In-plane 2D rotation introduces border interpolation padding, causes 180° orientation flip ambiguities on machine screws with subtle head/tip width differences, and fails to align the 3D helical roll angle around the cylindrical axis.
+  2. **PatchCore Experimental Architecture:**
+     - Implemented `PatchCore` in `src/app/vision/patchcore.py` (ResNet-18 layers 2+3, 10,000 coreset memory bank, nearest-neighbor Euclidean scoring).
+     - Evaluated on identical calibration and held-out splits:
+       - **Held-out Specificity:** Increased from **28.57% (PaDiM)** to **47.62% (PatchCore)** (10 TN vs 6 TN).
+       - **Held-out False Positive Rate:** Decreased from **71.43%** to **52.38%**.
+       - **Held-out Pixel AUROC:** Maintained state-of-the-art at **0.9709**.
+       - **Held-out Balanced Accuracy:** Increased from 50.73% to **53.47%**.
+       - **Image AUROC:** Measured at 0.5730 held-out / 0.6433 calibration.
+  3. **Cable Sensitivity Deep-Dive:**
+     - Evaluated all 150 test cables against calibrated threshold 30.4218:
+       - `cut_outer_insulation`: 10/10 detected (100% recall, mean score 42.14)
+       - `missing_cable`: 11/12 detected (91.7% recall, mean score 33.55)
+       - `combined`: 10/11 detected (90.9% recall, mean score 41.86)
+       - `bent_wire`: 11/13 detected (84.6% recall, mean score 42.24)
+       - `cable_swap`: 9/12 detected (75.0% recall, mean score 34.02)
+       - `cut_inner_insulation`: 8/14 detected (57.1% recall, mean score 33.37)
+       - **`missing_wire`:** **1/10 detected (10.0% recall, 90% missed!)**, mean score = 21.74 vs clean cables 22.77. (Negative anomaly: missing conductor exposes background, matching background features seen in training).
+       - **`poke_insulation`:** **0/10 detected (0.0% recall, 100% missed!)**, mean score = 24.87 vs threshold 30.42. (Microscopic punctures downsampled by layer3 and diluted by $\sigma=4$ Gaussian smoothing).
+- **Unit Tests Added:**
+  - `tests/unit/test_patchcore.py`: 4 tests (initialization, feature shapes, fit memory bank, anomaly map, save/load cycle).
+  - Total test suite: **62 / 62 passed in 47.53s** across 10 test suites.
+- **Benchmarking Artifact:**
+  - Written to `runs/experimental_benchmarks.json`.
+- **Preservation Check:** All production PaDiM models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.
