@@ -79,4 +79,15 @@
   - Category-specific physical variances (e.g., twisted normal cables or crop-boundary specular glints on metal nuts) produce high distances without true physical failure.
   - Adding an explicit "Borderline Score" alert when $|raw - threshold| < 3.0$ and persistent "Decision Support Notice: Not an autonomous quality-control authority" establishes unambiguous operational accountability.
 
+---
+
+### 9. Multi-Category Scaling & Dynamic Model Registry (10-Category Target)
+- **Decision:** Scale the inspection platform to 10 MVTec AD categories by reusing the existing ResNet-18 PaDiM pipeline with dynamic category discovery and LRU model caching, preserving existing models (`bottle`, `cable`, `metal_nut`) and all benchmark records.
+- **Target Selection:** Add 7 high-value industrial categories across pharmaceuticals (`capsule`, `pill`), mechanical fasteners (`screw`), electronics (`transistor`), surface materials (`tile`), mesh filtration (`grid`), and industrial closures (`zipper`).
+- **Rationale:**
+  - *Pipeline Determinism:* The existing PaDiM architecture (patch Gaussians + batched matmul) is completely domain-agnostic and trains without gradient descent.
+  - *Storage & Memory Bound:* 10 models require 6.62 GB on disk. Implementing an LRU cache (capacity = 3) bounds active GPU/RAM footprint to $\approx 1.98\text{ GB}$.
+  - *Zero Downtime / Zero Code Changes:* Because `InspectionService.available_categories()` dynamically interrogates `data/index/vision/`, new models become immediately discoverable by the API and dashboard upon disk write.
+
+
 

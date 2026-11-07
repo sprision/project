@@ -159,3 +159,30 @@
      - Added `test_borderline_score_generates_human_review_recommendation` in `tests/unit/test_report.py`.
      - All **48 unit tests passing** across 8 test suites.
 - **Preservation Check:** All existing models (`data/index/vision/`) and evaluation benchmarks (`runs/`) remain intact.
+
+---
+
+### Session 6: 10-Category Expansion Feasibility Study & Architecture Design
+- **Date & Local Time:** 2026-11-07T13:58:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:** Evaluate feasibility and design the architectural roadmap to expand the inspection system from 3 to 10 MVTec AD categories, reusing existing pipelines while strictly preserving current models and benchmarks.
+- **Key Findings & Quantitative Estimates:**
+  1. **Category Selection (7 new + 3 existing = 10 total):**
+     - Fasteners: `metal_nut` (existing), `screw` (new).
+     - Electronics: `cable` (existing), `transistor` (new).
+     - Pharmaceuticals & Packaging: `bottle` (existing), `capsule` (new), `pill` (new).
+     - Surface Textures & Closures: `tile` (new), `grid` (new), `zipper` (new).
+  2. **Computational Effort:**
+     - Training (patch Gaussian covariance fit): ~15–20s per category on CUDA GPU (~2 mins total for 7 categories).
+     - Threshold Calibration (50-seed Monte Carlo): ~25–35s per category (~3.5 mins total).
+     - CV AUROC Evaluation: ~20s per category (~2.3 mins total).
+     - Combined automated execution time: **~7 to 10 minutes on CUDA GPU** (~35 mins on CPU).
+  3. **Storage & Memory Footprint:**
+     - Raw Dataset: ~2.1 GB download from Hugging Face mirror `foersben/mvtec-ad`.
+     - Model Pickles: 662 MB per category $\implies$ 6.62 GB total across 10 categories.
+     - In-Memory RAM/VRAM: Lazy loading prevents loading all models into memory; LRU cache (capacity = 3) bounds active VRAM to ~1.98 GB.
+  4. **Architecture Compatibility:**
+     - Dynamic discovery via `InspectionService.available_categories()` automatically indexes any subfolder with `padim.pkl` and `threshold.json`.
+     - Core API routes (`GET /api/categories`, `POST /api/inspect`) and frontend dropdown require zero code modifications.
+- **Context Updates:** Documented in `ARCHITECTURE.md`, `DECISIONS.md`, `TASK_TRACKER.md`, and `SESSION_LOG.md`.
+- **Preservation Check:** All existing models and evaluation benchmarks strictly untouched; no training executed in this turn.

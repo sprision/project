@@ -88,10 +88,17 @@
 
 ## Current / Ongoing Tasks
 
-- [ ] Interactive live browser test verification (launching uvicorn outside sandbox or on user command).
+- [ ] **10-Category Expansion Pipeline Execution (Planned)**
+  - Stage 1: Download raw datasets for 7 target categories (`capsule`, `pill`, `screw`, `transistor`, `tile`, `grid`, `zipper`) via `scripts/download_mvtec.py`.
+  - Stage 2: Fit PaDiM weights via `scripts/fit_padim.py` (~15s per category on CUDA).
+  - Stage 3: Calibrate decision thresholds via `scripts/calibrate_thresholds.py` (50-seed Monte Carlo sweeps).
+  - Stage 4: Run CV benchmark evaluation and record in separate evaluation files.
+  - Stage 5: Ingest matching technical specifications into Knowledge Base (`data/kb/`).
+  - Stage 6: Verify API dynamic category discovery and dashboard dropdown population.
 
 ---
 
 ## Pending Tasks
 
-- [ ] Optional: Add Git LFS tracking configuration for remote repositories.
+- [ ] Interactive live browser test verification (launching uvicorn outside sandbox or on user command).
+- [ ] Add Git LFS tracking configuration for remote repositories (for 6.62 GB model pickle footprint).

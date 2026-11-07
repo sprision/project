@@ -117,3 +117,37 @@ The system is organized into decoupled layers: a thin HTTP API presentation laye
 - **Empty Knowledge Base:** Retriever returns `note="no documents indexed"`; agent reports limitation that recommendations lack technical grounding.
 - **LLM Unavailable / Failed:** Automatic silent fallback to deterministic extractive report generator; limitation is recorded in report stating fallback reason.
 
+---
+
+## Multi-Category Scaling & Model Registry Architecture (8–10 Category Expansion Plan)
+
+To transition from the initial 3-category baseline (`bottle`, `cable`, `metal_nut`) to an enterprise-grade 10-category platform without breaking existing models or core inspection logic:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Dynamic Model Registry (data/index/vision/)                     │
+│                                                                                        │
+│  bottle/          cable/           metal_nut/       capsule/        screw/     ...     │
+│  ├ padim.pkl      ├ padim.pkl      ├ padim.pkl      ├ padim.pkl     ├ padim.pkl        │
+│  └ threshold.json └ threshold.json └ threshold.json └ threshold.json └ threshold.json  │
+└──────────────────────────────────────────┬─────────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                           InspectionService (services.py)                              │
+│                                                                                        │
+│  - Dynamic Category Discovery: Scans index directory for valid (padim.pkl, threshold)  │
+│  - LRU Model Cache (Capacity = 3): Keeps max 3 models in memory (~1.98 GB cap)         │
+│  - Transparent Lazy Loading: Loads requested category on-demand; evicts LRU            │
+│  - API Integration: GET /api/categories exposes active categories to frontend          │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Architectural Principles for Multi-Category Scaling:
+1. **Zero Core Logic Modification:** Core modules (`model.py`, `agent.py`, `tools.py`, `routes.py`) operate on abstract category identifiers. Adding a category requires only writing its fitted pickle and threshold JSON to disk.
+2. **LRU In-Memory Cache:** PaDiM models are ~662 MB each. An LRU cache with capacity 3 ensures memory consumption never exceeds ~2.0 GB RAM/VRAM regardless of how many models are stored on disk.
+3. **Automated End-to-End Pipeline:** Each category uses identical execution scripts:
+   - `scripts.download_mvtec` -> `scripts.fit_padim` -> `scripts.calibrate_thresholds` -> `scripts.evaluate_cv` -> `scripts.validate_anomaly_detection`.
+4. **Knowledge Base Parity:** New categories register corresponding technical inspection guidelines into `data/kb/` so agent retrieval citations remain grounded.
+
+
