@@ -1,0 +1,30 @@
+PaDiM — Patch Distribution Modelling for Anomaly Detection
+Source: Defard, Setkov, Loesch, Audigier. "PaDiM: a Patch Distribution
+Modeling Framework for Anomaly Detection and Localization." ICPR 2021
+workshop (DIPA). This document summarises the method.
+
+1. Principle
+PaDiM learns a probabilistic model of the NORMAL patch distribution. A
+pretrained CNN (commonly ResNet-18) extracts multi-scale features; features
+from the first three layers are concatenated per spatial location to form
+patch embeddings. Each patch location is modelled as a multivariate Gaussian
+(mean + covariance) estimated from the defect-free training set.
+
+2. Scoring
+At inference, the Mahalanobis distance between a test patch embedding and its
+location's learned Gaussian yields an anomaly score per location, producing an
+anomaly map. A Gaussian smoothing (sigma=4) is applied and the map is upsampled
+to input resolution. The image-level score is the maximum of the map.
+
+3. Interpretation and limits
+High Mahalanobis distance = the local patch statistics deviate from training
+normality. It does NOT classify the defect type, and it does NOT measure
+severity or structural consequence. Scores are relative to the fitted
+distribution and are NOT calibrated probabilities. Borderline scores near the
+chosen threshold should be treated as uncertain and flagged for human review.
+
+4. Practical notes
+Performance depends on how representative the defect-free training set is.
+Domain shift (lighting, orientation, new product variants) can produce false
+positives — an anomalous score may reflect benign variation rather than a real
+defect. Use threshold as a triage aid, not an automated pass/fail authority.

@@ -1,0 +1,28 @@
+Maintenance Decision Support — Using Inspection Results
+Source: generic condition-based-maintenance practice, authored for this
+project's knowledge base.
+
+1. How to read a result
+An inspection result combines (a) visual observations from the vision model,
+(b) retrieved technical facts from documentation, (c) inspection history, and
+(d) recommendations. Visual observations describe what the model detected;
+retrieved facts are cited from documents; recommendations are decision support,
+not authorisations.
+
+2. Decision support, not automation
+The system triages and prioritises — it does not authorise operating,
+repairing, or shutting down equipment. Final decisions rest with qualified
+personnel who can inspect the equipment physically and consider context the
+model cannot see.
+
+3. Using history and comparison
+Comparing the current anomaly score and defect regions to prior inspections of
+the same asset reveals new vs recurring findings and trends. A stable,
+previously-accepted finding is treated differently from a new or growing one —
+trend direction matters more than a single snapshot.
+
+4. Data quality and limits
+Results are only as good as the image (focus, lighting, coverage) and the fit
+of the vision model to that equipment. Out-of-distribution inputs and
+unrepresentative training data reduce reliability — treat low-confidence or
+unusual inputs with caution and note them as limitations.

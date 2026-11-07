@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project data / artifacts (large or generated)
+data/raw/
+data/index/
+data/kb/*.pdf
+runs/
+artifacts/
+*.ckpt
+*.pt
+*.onnx
+.claude-tmp/
+
+# Environment / secrets
+.env
+*.log
+.DS_Store

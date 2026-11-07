@@ -1,0 +1,32 @@
+Surface Inspection — General Decision-Support Guidance
+Source: general non-destructive-testing (NDT) and machine-vision practice,
+compiled for this project's knowledge base. This is guidance text authored for
+the system, not a specific manufacturer's manual; cite it as such.
+
+1. Common surface defect categories
+Scratches/scoring, dents and pits, cracks/crazing, contamination or foreign
+material, corrosion/oxidation, porosity/inclusions, deformation or bent
+features, missing or broken components, and coating/print defects. Different
+categories carry different risk: cracks and broken structure are usually more
+safety-relevant than cosmetic scratches.
+
+2. Visual-inspection decision factors
+Consider defect size relative to the part, location (load-bearing or sealing
+surfaces vs cosmetic faces), count and clustering, depth cues, and whether the
+defect is new or previously recorded. A single cosmetic mark may be acceptable
+where the same mark on a critical surface is not.
+
+3. Uncertainty and escalation
+Image-based assessment is inherently limited: it sees surface appearance only,
+not internal condition, material property, or load history. An anomalous image
+score should trigger human inspection and, where warranted, a complementary
+NDT method (dye penetrant, ultrasonic, magnetic particle) rather than a direct
+scrap/repair decision. Borderline results and first-of-type findings warrant
+conservative handling.
+
+4. When to escalate
+Escalate to a qualified inspector/engineer when: the anomaly score is high or
+regions are large/growing; the defect is on a critical surface; history shows
+recurrence or trend; or the defect type is safety-relevant (crack, broken
+structure). Do not authorise continued operation, repair, or shutdown on the
+basis of the image score alone.

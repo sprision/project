@@ -1,0 +1,29 @@
+MVTec AD Dataset — Industrial Anomaly Detection
+Source: Bergmann, Fauser, Sattlegger, Steger. "MVTec AD — A Comprehensive
+Real-World Dataset for Unsupervised Anomaly Detection." CVPR 2019.
+This document paraphrases the dataset description; it does not replace the paper.
+
+1. Overview
+MVTec AD contains 5,354 high-resolution images of 15 object and texture
+categories captured under industrial conditions. It is designed for unsupervised
+anomaly detection: training sets contain ONLY defect-free images, while test
+sets contain both defect-free images and images with labelled defects.
+
+2. Defect types
+Depending on the category, defects include scratches, dents, contaminations,
+structural changes (e.g. bent/misplaced parts), broken regions, holes, cuts,
+glue strips, and colour/texture deviations. Over 70 distinct defect types are
+annotated. Pixel-precise ground-truth masks are provided for every defective
+test image, enabling pixel-level (segmentation) evaluation.
+
+3. Task definition
+The task is anomaly detection/localisation, NOT supervised classification.
+Because the model sees only good examples during training, a high anomaly score
+indicates deviation from learned normality — it is a hypothesis of a defect,
+not a confirmed diagnosis of a specific defect class.
+
+4. Evaluation
+Standard metrics are image-level AUROC (does the score rank defective above
+normal?) and pixel-level AUROC or PRO (does the anomaly map align with the
+ground-truth mask?). A single threshold may be reported alongside AUROC for
+operational use.
