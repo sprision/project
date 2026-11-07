@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.claude-tmp
+data/raw
+data/uploads/*
+data/heatmaps/*
+data/raw/**
+*.log
+

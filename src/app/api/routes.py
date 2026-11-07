@@ -113,3 +113,23 @@ def report_detail(insp_id: int) -> dict:
     if r is None:
         raise HTTPException(404, "inspection not found")
     return r
+
+
+@router.get("/eval/cv")
+def eval_cv() -> dict:
+    import json
+    s = get_settings()
+    p = s.runs_dir / "eval_cv.json"
+    if not p.exists():
+        raise HTTPException(404, "CV evaluation not found")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+@router.get("/eval/calibration")
+def eval_calibration() -> dict:
+    import json
+    s = get_settings()
+    p = s.runs_dir / "calibration.json"
+    if not p.exists():
+        raise HTTPException(404, "Calibration evaluation not found")
+    return json.loads(p.read_text(encoding="utf-8"))

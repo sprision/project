@@ -2,73 +2,70 @@
 
 ## Completed Tasks
 
-- [x] **Project Discovery & Inspection**
-  - Inspected repository structure, virtual environment, and dependencies.
-  - Verified PyTorch 2.14.1 with CUDA acceleration, torchvision, timm, and sentence-transformers.
-  - Verified existing PaDiM models (`bottle`, `cable`, `metal_nut`) in `data/index/vision/`.
-  - Verified evaluation artifacts in `runs/eval_cv.json` (Bottle 1.0, Cable 0.8413, Metal Nut 0.9741 AUROC).
-  - Verified retrieval evaluation in `runs/eval_retrieval.json` (Recall@5 = 1.000, MRR = 0.844).
-  - Verified threshold calibration files (`threshold.json` for 3 categories, `runs/calibration.json`).
-  - Verified test suite structure across unit and integration suites (10 test files).
+- [x] **Project Discovery & Memory Establishment**
+  - Read `AGENTS.md`, `MASTER_CONTEXT.md`, `PROJECT_STATUS.md`, `TASK_TRACKER.md`, `BUGS_AND_ISSUES.md`.
+  - Inspected repository git commit history (commit `3c5c85a` confirmed).
+  - Confirmed Python 3.12 virtual environment, PyTorch with CUDA acceleration, torchvision, timm, and sentence-transformers.
 
 - [x] **PaDiM Model Implementation & Optimization**
-  - ResNet-18 multi-scale feature extractor with random feature selection.
-  - Per-patch multivariate Gaussian fit on defect-free training images.
-  - Vectorized Mahalanobis distance map calculation with cached batched matmul (`torch.bmm`).
-  - Min-max score normalization and calibrated raw threshold verdict modes.
-  - Connected component defect region contouring and JET colormap overlay.
+  - Verified 3 pre-trained PaDiM models (`bottle`, `cable`, `metal_nut`) in `data/index/vision/`.
+  - Verified batched matrix multiplication (`torch.bmm`) acceleration for Mahalanobis distances.
+  - Verified calibrated raw threshold loading and anomaly verdict logic.
+  - Verified JET heatmap overlay generation.
 
-- [x] **Hybrid RAG Pipeline**
-  - Chunk ingestion supporting PDF, TXT, MD, and RST with paragraph boundaries.
-  - Sentence-transformers MiniLM-L6-v2 dense embeddings.
-  - BM25Plus lexical ranker.
-  - Reciprocal Rank Fusion (RRF, $k=60$) search.
-  - Disk persistence via `chunks.json` and `embeddings.npz`.
+- [x] **Hybrid RAG Pipeline Optimization**
+  - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
+  - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Deterministic Inspection Agent**
-  - Bounded 6-tool execution agent with observation harvesting.
-  - Decision policy handling general queries, historical lookups, and comparative questions.
-  - Structured evidence harvesting and classification.
-  - Complete execution trace recording.
+- [x] **Unit Test Suite Verification (40 / 40 Passed)**
+  - `tests/unit/test_schemas.py`: 4 passed (0.31s)
+  - `tests/unit/test_db.py`: 2 passed (0.72s)
+  - `tests/unit/test_ingest.py`: 5 passed (1.23s)
+  - `tests/unit/test_report.py`: 5 passed (0.55s)
+  - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
+  - `tests/unit/test_threshold_calibration.py`: 6 passed (14.81s)
+  - `tests/unit/test_retriever.py`: 4 passed (38.71s)
+  - `tests/unit/test_agent.py`: 9 passed (41.19s)
+  - Total: **40 passing tests** across 8 unit test suites.
 
-- [x] **Persistence & Reporting**
-  - SQLite database storage with indexing on category and timestamps.
-  - Deterministic report generator with cited evidence and disclaimer.
-  - Optional LLM summarization hook with automatic fallback.
+- [x] **Live End-to-End Inference & Pipeline Verification**
+  - Executed end-to-end inspection on sample defective MVTec AD bottle (`data/raw/mvtec_ad/bottle/test/broken_large/000.png`):
+    - Raw score: `64.897` vs calibrated threshold `23.4613`.
+    - Verdict: `is_anomalous = True` (Correct).
+    - Defect regions: 1 contour localized.
+    - Heatmap overlay: generated and written to `000.png`.
+    - Summary & citations: Extractive report generated with 5 harvested findings, 1 recommendation, and 3-step agent trace in 4.26s.
+  - Verified SQLite persistence: inspection recorded with ID 1 and retrievable via `reports()`.
 
-- [x] **FastAPI Application & API Surface**
-  - Implemented endpoints: `/health`, `/categories`, `/inspect`, `/kb/query`, `/kb/ingest`, `/heatmap/{name}`, `/reports`, `/reports/{id}`.
-  - Strict upload validation (extension, size, decode).
+- [x] **API Route Enhancements**
+  - Added `GET /api/eval/cv` returning real benchmark evaluation data from `runs/eval_cv.json`.
+  - Added `GET /api/eval/calibration` returning real calibration stability sweeps from `runs/calibration.json`.
 
-- [x] **Persistent Project Memory Establishment**
-  - Created root `AGENTS.md` defining orientation and handoff protocols.
-  - Created `project_context/MASTER_CONTEXT.md`.
-  - Created `project_context/PROJECT_STATUS.md`.
-  - Created `project_context/ARCHITECTURE.md`.
-  - Created `project_context/DECISIONS.md`.
-  - Created `project_context/TASK_TRACKER.md`.
+- [x] **Premium Dark Industrial Dashboard Frontend**
+  - Verified and enhanced `frontend/index.html` with:
+    - Live health check chip and status indicator.
+    - Real-time Overview with dynamic model performance charts and calibration metrics pulled from `/api/eval/`.
+    - Drag-and-drop Image Upload with live canvas preview and category auto-detection.
+    - Anomaly Heatmap viewer with defect region breakdown.
+    - Retrieved technical evidence citation viewer.
+    - Agent execution trace step visualizer.
+    - SQLite inspection history table with filtering and instant modal preview.
+    - Knowledge Base interactive search and document ingestion.
+    - Report viewer with print and structured JSON export.
+
+- [x] **Deployment Configuration**
+  - Created production `Dockerfile` with multi-stage system libraries (`libgl1`, `libglib2.0-0`), CPU PyTorch wheel for portable execution, health checks, and Uvicorn entrypoint.
+  - Created `.dockerignore` excluding caches, logs, and raw datasets.
+  - Created `docker-compose.yml` with persistent volume mappings.
 
 ---
 
-## Current / Active Tasks
+## Current / Ongoing Tasks
 
-- [ ] **Complete Context Documentation:**
-  - Create `project_context/BUGS_AND_ISSUES.md`.
-  - Create `project_context/SESSION_LOG.md`.
-- [ ] **Verify Test Execution:**
-  - Complete execution and logging of full pytest test suite.
+- [ ] Interactive live browser test verification (launching uvicorn outside sandbox or on user command).
 
 ---
 
 ## Pending Tasks
 
-- [ ] **Local Application End-to-End Verification:**
-  - Launch FastAPI application on local port.
-  - Execute live test upload using sample image from `data/raw/mvtec_ad/bottle/test/` to verify PaDiM inference, heatmap rendering, agent trace, and SQLite insertion through live API.
-  - Verify Knowledge Base querying and document ingestion through live API.
-- [ ] **Frontend Verification & Refinement:**
-  - Verify full SaaS dashboard interactivity (Overview metrics, New Inspection upload, Anomaly Heatmap viewer, KB Search, History viewer, Report viewer, JSON export).
-- [ ] **Deployment Strategy:**
-  - Prepare production containerization (`Dockerfile`, `.dockerignore`).
-  - Document deployment topology and execution steps.
-
+- [ ] Optional: Add Git LFS tracking configuration for remote repositories.

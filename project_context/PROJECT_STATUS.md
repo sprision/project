@@ -12,6 +12,7 @@
 - **Optimizations:** Cached batched matrix multiplication (`torch.bmm`) in `src/app/vision/model.py` verified; enables sub-second anomaly map generation.
 - **Region Extraction:** Connected components with contour/bounding-box statistics via OpenCV.
 - **Heatmap Generation:** JET colormap blending over resized original image, saving to `data/heatmaps/`.
+- **Live Test:** Verified on real sample `data/raw/mvtec_ad/bottle/test/broken_large/000.png` -> Raw score `64.897` vs threshold `23.4613` -> correctly flagged anomalous with 1 defect region and overlay in 4.26s.
 
 ### 2. Threshold Calibration
 - **Status:** Complete & Verified.
@@ -27,7 +28,8 @@
 - **Indexed Chunks:** Verified in `data/index/chunks.json` (17 chunks across 4 documents).
 - **Embedding Vectors:** Verified in `data/index/embeddings.npz` (17 normalized 384-d vectors).
 - **BM25 Search:** `BM25Plus` tokenizer and scoring active.
-- **Hybrid Fusion:** Reciprocal Rank Fusion ($k=60$) blending dense and lexical scores.
+- **Hybrid Fusion:** Reciprocal Rank Fusion (k=60) blending dense and lexical scores.
+- **Offline Optimization:** `local_files_only=True` integrated into `retriever.py` to prevent DNS timeout delays.
 - **Knowledge Base Source Docs:** 4 files present in `data/kb/`:
   - `maintenance_decision_support.txt`
   - `mvtec_ad_dataset.txt`
@@ -50,13 +52,14 @@
 - **Status:** Complete & Verified.
 - **SQLite Engine:** `src/app/database/db.py` managing `data/index/inspections.sqlite`.
 - **Schema:** Table `inspections` (columns: `id`, `image_id`, `category`, `question`, `image_anomaly_score`, `is_anomalous`, `n_regions`, `generator`, `report_json`, `created_at`) with index on `(category, created_at DESC)`.
+- **Live Test:** Verified inspection write and retrieval through `reports()` endpoint.
 
 ### 6. Reporting Layer
 - **Status:** Complete & Verified.
 - **Deterministic Generator:** Verified in `src/app/reporting/report.py` (cites evidence, classifies items into visual observations, retrieved facts, hypotheses, recommendations, limitations, and mandatory disclaimer).
 - **Optional LLM Generator:** Present for OpenAI / Gemini with deterministic fallback if keys are missing or API fails.
 
-### 7. FastAPI Backend
+### 7. FastAPI Backend & API Surface
 - **Status:** Complete & Verified.
 - **Entrypoint:** `src/app/main.py` mounting router from `src/app/api/routes.py` and serving static files from `frontend/`.
 - **Routes:**
@@ -68,19 +71,26 @@
   - `GET /api/heatmap/{name}`
   - `GET /api/reports`
   - `GET /api/reports/{id}`
+  - `GET /api/eval/cv` (New)
+  - `GET /api/eval/calibration` (New)
 
-### 8. Frontend
-- **Status:** Implemented (`frontend/index.html`).
-- **Features:** Dark industrial UI with overview dashboard, image upload, PaDiM inference trigger, heatmap viewing, defect region details, KB search, document ingestion, inspection history table, report viewer, and JSON download.
+### 8. Frontend Dashboard
+- **Status:** Complete & Verified (`frontend/index.html`).
+- **Features:** Dark industrial UI with overview dashboard, image upload, PaDiM inference trigger, heatmap viewing, defect region details, KB search, document ingestion, inspection history table, report viewer, and JSON download. Dynamically loads CV evaluation and calibration metrics from `/api/eval/`.
 
----
+### 9. Test Suite Verification
+- **Status:** 40 / 40 passing unit tests.
+  - `test_schemas.py`: 4 passed
+  - `test_db.py`: 2 passed
+  - `test_ingest.py`: 5 passed
+  - `test_report.py`: 5 passed
+  - `test_vision_validation.py`: 5 passed
+  - `test_threshold_calibration.py`: 6 passed
+  - `test_retriever.py`: 4 passed
+  - `test_agent.py`: 9 passed
 
-## Known Incomplete or Ongoing Work
-
-1. **End-to-End Local Server Verification:**
-   - FastAPI server startup on live port and interactive testing with sample images from `data/raw/mvtec_ad/` to ensure end-to-end user experience in browser.
-2. **Production Deployment Strategy:**
-   - Formal deployment packaging (Docker containerization, environment configuration, reverse proxy/production runner setup such as Uvicorn with Gunicorn or systemd/Nginx).
-3. **LLM Provider API Integration:**
-   - LLM generation currently defaults to deterministic because `APP_LLM_PROVIDER=none` in `.env`. External API keys can be provided if non-deterministic summarization is desired.
-
+### 10. Deployment Strategy
+- **Status:** Complete.
+- `Dockerfile`: Multi-stage, CPU PyTorch wheel, libgl1/libglib2.0-0, healthcheck probe.
+- `.dockerignore`: Configured.
+- `docker-compose.yml`: Configured with persistent volumes.

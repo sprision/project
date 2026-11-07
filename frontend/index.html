@@ -798,26 +798,19 @@ async function initApp() {
 }
 
 /* ============================================================
-   EVAL RESULTS (from /runs/ - fetched via static)
+   EVAL RESULTS & CALIBRATION (from /api/eval/)
    ============================================================ */
 async function loadEvalResults() {
   try {
-    // We try to fetch eval data. If files aren't served statically, degrade gracefully.
-    const r = await fetch('/static/eval_data.json');
-    if (!r.ok) {
-      // Fallback: display known results
-      renderKnownPerf();
-      return;
-    }
-    const data = await r.json();
+    const data = await apiGet('/eval/cv');
     renderPerf(data);
-  } catch {
+  } catch (e) {
+    console.warn('Could not load eval/cv dynamically:', e);
     renderKnownPerf();
   }
 }
 
 function renderKnownPerf() {
-  // These are the known evaluation results from eval_cv.json
   const results = [
     { category: 'bottle', image_auroc: 1.0000, pixel_auroc: 0.9841 },
     { category: 'cable', image_auroc: 0.8413, pixel_auroc: 0.9516 },
@@ -848,7 +841,34 @@ function renderPerf(data) {
 }
 
 async function loadCalibration() {
-  // Display known calibration data
+  try {
+    const data = await apiGet('/eval/calibration');
+    renderCalibData(data.categories || {});
+  } catch (e) {
+    console.warn('Could not load eval/calibration dynamically:', e);
+    renderCalibFallback();
+  }
+}
+
+function renderCalibData(cats) {
+  let html = '<table class="data-table"><thead><tr><th>Category</th><th>Raw Threshold</th><th>Balanced Acc.</th><th>FPR</th><th>50-Seed Stability</th></tr></thead><tbody>';
+  for (const [cat, d] of Object.entries(cats)) {
+    const bAcc = d.evaluation_metrics ? d.evaluation_metrics.balanced_accuracy : (d.calibration_metrics ? d.calibration_metrics.balanced_accuracy : 0);
+    const fpr = d.evaluation_metrics ? d.evaluation_metrics.false_positive_rate : (d.calibration_metrics ? d.calibration_metrics.false_positive_rate : 0);
+    const stab = d.stability_50seeds ? d.stability_50seeds.eval_balanced_acc_mean : 0;
+    html += `<tr>
+      <td style="font-weight:600;color:var(--text-primary)">${cat}</td>
+      <td class="mono">${Number(d.threshold_raw).toFixed(3)}</td>
+      <td class="mono" style="color:${bAcc >= 0.9 ? 'var(--success)' : 'var(--warning)'}">${(bAcc*100).toFixed(1)}%</td>
+      <td class="mono">${(fpr*100).toFixed(1)}%</td>
+      <td class="mono">${(stab*100).toFixed(1)}%</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  $('ov-calibration').innerHTML = html;
+}
+
+function renderCalibFallback() {
   const cal = {
     bottle: { threshold_raw: 23.461, balanced_accuracy: 1.0, fpr: 0.0, stability_mean: 0.975 },
     cable: { threshold_raw: 30.422, balanced_accuracy: 0.831, fpr: 0.034, stability_mean: 0.737 },

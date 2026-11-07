@@ -74,7 +74,10 @@ class Retriever:
     def _get_embedder(self):
         if self._embedder is None:
             from sentence_transformers import SentenceTransformer
-            self._embedder = SentenceTransformer(self.embed_model_name)
+            try:
+                self._embedder = SentenceTransformer(self.embed_model_name, local_files_only=True)
+            except Exception:
+                self._embedder = SentenceTransformer(self.embed_model_name)
         return self._embedder
 
     def _embed(self, texts: list[str]) -> np.ndarray:

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  inspect-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: industrial-inspection-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_DEVICE=auto
+      - APP_LLM_PROVIDER=none
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ./data/index:/app/data/index
+      - ./data/kb:/app/data/kb
+      - inspection-uploads:/app/data/uploads
+      - inspection-heatmaps:/app/data/heatmaps
+    restart: unless-stopped
+
+volumes:
+  inspection-uploads:
+  inspection-heatmaps:
+
