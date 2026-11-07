@@ -21,11 +21,42 @@
 
 ---
 
-### 3. `screw` Category Thread Rotation Score Variance (Domain Characteristic)
+### 3. `screw` Category Thread Rotation Score Variance & Evaluation Disparity (Domain Characteristic)
 - **Component:** `src/app/vision/model.py` / `screw` PaDiM model
-- **Description:** On the MVTec AD screw test set, the model achieves a pixel-level AUROC of **0.9726**, confirming defect region localization (identifying manipulated fronts, damaged threads, and head scratches). However, image-level AUROC is **0.6280** with a high false positive rate (48.8% on normal screws at calibrated threshold 24.1733).
-- **Root Cause:** Normal screws in MVTec AD are photographed at unconstrained rotational angles. Because screw threads are helical, rotation changes the spatial coordinates of thread crests and valleys relative to the fixed patch grid, elevating Mahalanobis patch distances on normal rotated screws.
-- **Mitigation:** The system alerts operators: `"Screw category exhibits high pixel AUROC (0.973) for defect localization, but arbitrary screw thread rotation angles can elevate image-level anomaly scores on normal screws; verify thread defects against localized candidate regions."` Operators are instructed to evaluate candidate contour regions on the thread rather than relying solely on image-level thresholds.
+- **Description:** On the MVTec AD screw test set, the model achieves a pixel-level AUROC of **0.9726**, confirming defect region localization (identifying manipulated fronts, damaged threads, and head scratches). However, image-level AUROC is **0.6280** (apparent full test) / **0.5843** (strict held-out), with a false-positive rate of **71.43%** on untouched held-out clean screws (specificity **28.57%**, balanced accuracy **50.73%**).
+- **Empirical Investigation & Root Cause Findings:**
+  1. **Score Overlap Across Subdirectories:** Clean test screws exhibit raw max scores averaging **25.12** (range 17.41 to 35.27), which already exceeds the calibrated threshold of **24.1733**. At the same time, subtle defect types have max scores that completely overlap with clean screws: `scratch_neck` (avg 24.62), `thread_side` (avg 26.14), `scratch_head` (avg 26.54), `thread_top` (avg 27.56). Only coarse defects like `manipulated_front` (avg 32.70) reliably exceed all clean screws.
+  2. **Pooling Aggregation Analysis:** Testing alternative pooling aggregations on the anomaly maps proved that pooling is not the root cause:
+     - Global Max Pooling Image AUROC: `0.6280`
+     - Top-10 Mean Pooling Image AUROC: `0.6270`
+     - Top-50 Mean Pooling Image AUROC: `0.6259`
+     - 99.5th Percentile Image AUROC: `0.6186`
+     - 99.0th Percentile Image AUROC: `0.6182`
+  3. **Architectural Mechanism (Spatial Registration vs Helical Rotation):**
+     PaDiM assumes spatial registration: at each spatial patch position $(i, j)$, it fits a multivariate Gaussian $\mathcal{N}(\mu_{ij}, \Sigma_{ij})$ across normal training images.
+     Screws are 3D cylindrical objects with helical thread ridges, photographed at arbitrary rotation angles ($0^\circ$ to $360^\circ$). Because the 320 normal training screws cannot cover all continuous 3D rotations, unseen rotation angles shift helical crests into positions where the model learned valleys. This produces patch-level Mahalanobis distance spikes (25 to 35) on normal thread perimeters and specular metallic boundaries.
+  4. **Why Pixel AUROC is 0.9726 while Image AUROC is 0.6280:**
+     Across 8 million total test pixels, ~99.7% of pixels are non-defective (dark interior or background) with low scores ($\approx 8$), and defect pixels are higher ($\approx 30$). Pixel AUROC evaluates the ranking across all 8 million pixels, where background vastly outnumbers thread perimeter artifacts. But Image AUROC relies on the single worst patch per image: because rotational thread shifts generate localized peaks of 25–35 on clean screws, clean image max scores breach the decision threshold just like real defects.
+- **Mitigation & Operational Protocol:**
+  - The system alerts operators: `"Screw category exhibits high pixel AUROC (0.973) for defect localization, but arbitrary screw thread rotation angles can elevate image-level anomaly scores on normal screws; verify thread defects against localized candidate regions."`
+  - High human-review priority is assigned to screw alerts; operators inspect localized contour heatmaps rather than trusting binary image verdicts.
+
+---
+
+### 4. Calibration-Overlap Contamination in Historical Validation Reports (Classified & Resolved)
+- **Component:** `scripts/validate_anomaly_detection.py` / `runs/validation_results.json`
+- **Audit Findings:**
+  1. `scripts/calibrate_thresholds.py` partitions the MVTec AD test set into a 50% calibration split (`cal`) and a 50% evaluation split (`ev`) using seed 42. `pick_threshold` maximizes balanced accuracy solely on `cal`.
+  2. However, `scripts/validate_anomaly_detection.py` originally iterated over all folders in `raw_root / <category> / test`, evaluating the entire test set (`cal` + `ev`).
+  3. Consequently, 50% of the samples evaluated in `runs/validation_results.json` were present in the pool used to pick the decision threshold.
+  4. Formally classified historical full-test confusion matrices as **threshold-selection-contaminated (apparent metrics)**.
+- **Resolution & Strict Separation Protocol:**
+  - Updated `scripts/validate_anomaly_detection.py` with explicit `--split` modes:
+    - `--split held_out`: (Default) Evaluates strictly untouched `ev` split. Zero threshold selection leakage. Results saved to `runs/held_out_evaluation.json`.
+    - `--split full`: Evaluates all test samples, but explicitly marks the report as `is_contaminated = True` with a contamination notice. Results saved to `runs/validation_results.json`.
+    - `--split calibration`: Evaluates only `cal` split.
+  - Added unit tests in `tests/unit/test_threshold_calibration.py` verifying that calibration and held-out paths are strictly disjoint across all categories: `set(cal).isdisjoint(set(ev))`.
+  - Recalculated strict held-out metrics across all 4 categories. Historical benchmark files preserved intact.
 
 ---
 

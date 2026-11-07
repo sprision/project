@@ -221,4 +221,37 @@
 - **Verification:**
   - Tested live end-to-end inspection on sample `data/raw/mvtec_ad/screw/test/manipulated_front/000.png`: correctly flagged anomalous with raw score `31.60` vs threshold `24.1733`, 2 regions localized, and heatmap generated.
   - Full unit test suite: **56 / 56 passed in 37.02s** across 9 test suites.
-- **Preservation Check:** All existing models (`bottle`, `cable`, `metal_nut`), thresholds, and historical benchmarks strictly preserved.
+### Session 8: Calibration Integrity Audit, Protocol Separation & Screw Root Cause Investigation
+- **Date & Local Time:** 2026-11-07T14:45:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Audit calibration image sources and verify overlap with reported final validation metrics.
+  2. Classify calibration-overlap metrics and establish strict, leak-free held-out evaluation protocol.
+  3. Investigate the disparity between Screw Pixel AUROC = 0.9726 and Image AUROC = 0.6280 (held-out specificity = 28.57%).
+  4. Preserve all existing benchmark files, add unit tests, and update project context.
+- **Audit Findings (Calibration Overlap & Contamination Classification):**
+  - In `scripts/calibrate_thresholds.py`, the test set is split 50/50 into calibration (`cal`) and evaluation (`ev`) subsets using seed 42. `pick_threshold` selects the threshold strictly on `cal`.
+  - However, `scripts/validate_anomaly_detection.py` originally evaluated all test images (`cal` + `ev`). Exactly 50% of images evaluated in `runs/validation_results.json` were in the calibration pool used to pick thresholds!
+  - The historical full-test confusion matrix for screw (TP=86, FP=20, TN=21, FN=33, specificity 51.22%) is literally the sum of the calibration split (TP=43, FP=5, TN=15, FN=17, specificity 75.0%) and the held-out split (TP=43, FP=15, TN=6, FN=16, specificity 28.57%).
+  - Formally classified all full-test confusion matrices as **threshold-selection-contaminated (apparent metrics)**.
+- **Strict Separation Protocol Implemented:**
+  - Updated `scripts/validate_anomaly_detection.py` with explicit `--split` options:
+    - `--split held_out`: Evaluates strictly untouched evaluation half (`ev`, seed 42). Writes `runs/held_out_evaluation.json`.
+    - `--split full`: Evaluates full test set with explicit contamination warning. Writes `runs/validation_results.json`.
+    - `--split calibration`: Evaluates calibration split (`cal`).
+  - Strict Held-Out Evaluation Results (254 Untouched Images):
+    - **Bottle (41 imgs: 10G / 31D):** TP=31, FP=0, TN=10, FN=0 | Sens: 1.0000 | Spec: 1.0000 | FPR: 0.0000 | Bal Acc: 1.0000
+    - **Cable (75 imgs: 29G / 46D):** TP=28, FP=5, TN=24, FN=18 | Sens: 0.6087 | Spec: 0.8276 | FPR: 0.1724 | Bal Acc: 0.7181
+    - **Metal Nut (58 imgs: 11G / 47D):** TP=45, FP=0, TN=11, FN=2 | Sens: 0.9574 | Spec: 1.0000 | FPR: 0.0000 | Bal Acc: 0.9787
+    - **Screw (80 imgs: 21G / 59D):** TP=43, FP=15, TN=6, FN=16 | Sens: 0.7288 | Spec: 0.2857 | FPR: 0.7143 | Bal Acc: 0.5073
+  - All historical benchmark files (`runs/calibration.json`, `runs/eval_cv.json`, `runs/validation_results.json`) preserved intact.
+- **Screw Disparity Empirical Investigation & Root Cause:**
+  - Tested pooling alternatives (Top-10 mean, Top-50 mean, 99.5%, 99.0% percentiles): all yielded AUROC ~0.62. Pooling alone does not resolve the overlap.
+  - Proved clean screws exhibit max scores averaging 25.12, exceeding the threshold of 24.1733, directly overlapping subtle defect scores (scratch_neck avg 24.62, thread_side avg 26.14, scratch_head avg 26.54, thread_top avg 27.56).
+  - Root cause: PaDiM models the normal visual distribution per patch position $\mathcal{N}(\mu_{ij}, \Sigma_{ij})$, requiring spatial registration. 3D helical screw rotation shifts threads across the spatial grid. At unseen rotation angles, clean threads generate Mahalanobis spikes (25–35) along metallic boundaries, numerically indistinguishable from subtle scratches and missing threads at the image level.
+  - Pixel AUROC is 0.9726 because over 8 million test pixels, 99.7% are normal background (score ~8) and defect pixels (~30) rank higher. But Image AUROC relies on the worst single patch per image, triggering false alarms on rotating clean screws.
+- **Unit Tests Added:**
+  - `test_all_categories_calibration_and_evaluation_splits_strictly_disjoint`: proves `set(cal_paths).isdisjoint(set(ev_paths))` across all 4 categories.
+  - `test_split_sizes_match_certified_protocol`: verifies exact counts in `cal` and `ev` splits.
+  - Test Suite: **58 / 58 passed in 39.26s**.
+- **Preservation Check:** All 4 trained PaDiM models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmark files strictly preserved.

@@ -149,3 +149,44 @@ def test_pick_threshold_maximizes_balanced_accuracy():
     assert m["balanced_accuracy"] == 1.0
 
 
+def test_all_categories_calibration_and_evaluation_splits_strictly_disjoint():
+    """Verify that for every production category, calibration and held-out paths are disjoint."""
+    from scripts.validate_anomaly_detection import collect_image_paths, split_stratified_paths
+    raw_root = Path("data/raw/mvtec_ad")
+    for cat in ["bottle", "cable", "metal_nut", "screw"]:
+        cat_dir = raw_root / cat / "test"
+        if not cat_dir.exists():
+            continue
+        paths = collect_image_paths(cat_dir)
+        cal, ev = split_stratified_paths(paths, seed=42, frac=0.5)
+
+        assert len(cal) + len(ev) == len(paths)
+        cal_set = {p for _, p in cal}
+        ev_set = {p for _, p in ev}
+        assert cal_set.isdisjoint(ev_set), f"Overlap detected between cal and ev for {cat}!"
+
+
+def test_split_sizes_match_certified_protocol():
+    """Verify exact count of normal and defective samples in cal and held-out ev splits."""
+    from scripts.validate_anomaly_detection import collect_image_paths, split_stratified_paths
+    raw_root = Path("data/raw/mvtec_ad")
+    expected = {
+        "bottle": {"cal_good": 10, "cal_defect": 32, "ev_good": 10, "ev_defect": 31},
+        "cable": {"cal_good": 29, "cal_defect": 46, "ev_good": 29, "ev_defect": 46},
+        "metal_nut": {"cal_good": 11, "cal_defect": 46, "ev_good": 11, "ev_defect": 47},
+        "screw": {"cal_good": 20, "cal_defect": 60, "ev_good": 21, "ev_defect": 59},
+    }
+    for cat, exp in expected.items():
+        cat_dir = raw_root / cat / "test"
+        if not cat_dir.exists():
+            continue
+        paths = collect_image_paths(cat_dir)
+        cal, ev = split_stratified_paths(paths, seed=42, frac=0.5)
+
+        assert sum(1 for g, _ in cal if g) == exp["cal_good"]
+        assert sum(1 for g, _ in cal if not g) == exp["cal_defect"]
+        assert sum(1 for g, _ in ev if g) == exp["ev_good"]
+        assert sum(1 for g, _ in ev if not g) == exp["ev_defect"]
+
+
+

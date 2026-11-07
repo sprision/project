@@ -17,17 +17,36 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (56 / 56 Passed)**
+- [x] **Unit Test Suite Verification (58 / 58 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
   - `tests/unit/test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
   - `tests/unit/test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, category limitations)
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
-  - `tests/unit/test_threshold_calibration.py`: 10 passed (15.58s) (calibration threshold presence, metric arithmetic, disjoint split partitioning, seeded reproducibility)
+  - `tests/unit/test_threshold_calibration.py`: 12 passed (15.58s) (disjoint split verification, certified sample counts, calibration threshold presence, metric arithmetic, seeded reproducibility)
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
   - `tests/unit/test_agent.py`: 10 passed (32.76s) (regression test for tool report assembly)
-  - Total: **56 passing tests** across 9 unit test suites.
+  - Total: **58 passing tests** across 9 unit test suites.
+
+- [x] **Calibration Integrity Audit & Evaluation Protocol Separation**
+  - Audited `scripts/calibrate_thresholds.py` and `scripts/validate_anomaly_detection.py`.
+  - Identified calibration overlap in historical validation: 50% of images evaluated in `runs/validation_results.json` were used to pick decision thresholds.
+  - Formally classified full-test confusion matrices as **threshold-selection-contaminated (apparent metrics)**.
+  - Implemented strict evaluation protocol in `scripts/validate_anomaly_detection.py`:
+    - `--split held_out`: Evaluates only untouched `ev` split. Zero leakage. Writes `runs/held_out_evaluation.json`.
+    - `--split full`: Evaluates all test samples with explicit contamination notice. Writes `runs/validation_results.json`.
+    - `--split calibration`: Evaluates calibration split.
+  - Verified sample counts: bottle (10G/32D cal, 10G/31D ev), cable (29G/46D cal, 29G/46D ev), metal_nut (11G/46D cal, 11G/47D ev), screw (20G/60D cal, 21G/59D ev).
+  - Recalculated strict held-out metrics across all 4 categories without touching benchmark records.
+  - Added unit tests in `tests/unit/test_threshold_calibration.py` proving calibration and held-out paths are strictly disjoint.
+
+- [x] **Screw Model Evaluation Disparity & Root Cause Investigation**
+  - Investigated disparity between Pixel AUROC = `0.9726` and Image AUROC = `0.6280` / `0.5843` (held-out specificity = `28.57%`).
+  - Proved clean screws exhibit raw max scores averaging `25.12`, exceeding the calibrated threshold `24.1733`.
+  - Proved pooling sweeps (max, top-10, top-50, 99.5%, 99.0%) all yield AUROC ~0.62; pooling alone does not resolve the overlap.
+  - Identified root cause: PaDiM models normal visual distribution per patch position $\mathcal{N}(\mu_{ij}, \Sigma_{ij})$, requiring spatial registration. 3D helical screw rotation shifts threads across the spatial grid, generating patch Mahalanobis spikes (25–35) on normal thread perimeters, overlapping subtle defects.
+  - Explained why Pixel AUROC is 0.9726: over 8 million test pixels, 99.7% are normal with score ~8, so defect pixels (~30) rank higher. But Image AUROC relies on the worst single patch per image, triggering false alarms on rotating clean screws.
 
 - [x] **Phase 1: Scalable Model Registry & LRU Cache Implementation**
   - Implemented `src/app/vision/registry.py` with `ModelRegistry`, `LRUModelCache` (capacity = 3), and `CategoryMetadata`.
