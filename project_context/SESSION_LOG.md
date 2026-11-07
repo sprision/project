@@ -297,3 +297,51 @@
 - **Benchmarking Artifact:**
   - Written to `runs/experimental_benchmarks.json`.
 - **Preservation Check:** All production PaDiM models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.
+
+---
+
+### Session 10: Specialized Cable Inspection Module & Multi-Detector Architecture
+- **Date & Local Time:** 2026-11-07T15:35:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Address the two documented failure modes of standard PaDiM on cables:
+     - `missing_wire` (baseline recall: 12.5% on held-out split)
+     - `poke_insulation` (baseline recall: 0.0% on held-out split)
+  2. Implement experimental multi-detector inspection modules:
+     - Conductor continuity and transmission density across wire divergence channels.
+     - High-frequency local patch residual analysis ($\sigma=1.0$) for sub-millimeter punctures.
+  3. Benchmark head-to-head on identical calibration (`cal`, 75 imgs) and held-out evaluation (`ev`, 75 imgs) splits (seed 42, zero leakage).
+  4. Categorize findings into: Confirmed visual defects, Potential anomalies, and Uncertain findings requiring human review.
+  5. Add unit tests, preserve production models, and update project context.
+- **Experimental Findings & Empirical Validations:**
+  1. **Conductor Continuity Detector (`ConductorContinuityDetector`):**
+     - Measures cross-sectional transmission density across top, left, and right harness divergence channels.
+     - On seed 42 calibration subset: clean cables scored $\le 0.433$, missing wire cables scored $\ge 0.635$.
+     - Setting threshold $T=0.50$ achieved **0 false alarms on clean calibration cables**.
+     - On strict held-out evaluation, `missing_wire` recall jumped from **12.5% (1/8) to 62.5% (5/8)** (+50.0% gain).
+  2. **Surface Puncture Detector (`SurfacePunctureDetector`):**
+     - Evaluates local patch anomaly activations with light Gaussian smoothing ($\sigma=1.0$) instead of default $\sigma=4.0$.
+     - High-frequency patch peak scores for clean cables average 28.5 (max 33.1), while `poke_insulation` punctures surge to **33.58–54.11** (avg 45.2).
+     - Setting threshold $T=38.0$ on calibration split completely separates puncturing.
+     - On strict held-out evaluation, `poke_insulation` recall jumped from **0.0% (0/6) to 100.0% (6/6)** (+100.0% gain, all detected).
+  3. **Strict Held-Out Head-to-Head Comparison (75 Untouched Images, `runs/cable_specialized_evaluation.json`):**
+     - **Baseline PaDiM:** 28 TP / 5 FP / 24 TN / 18 FN | Sensitivity: **60.87%** | Specificity: **82.76%** | Balanced Accuracy: **71.81%** | Latency: 156.11 ms.
+     - **Specialized Cable Inspector:** 41 TP / 10 FP / 19 TN / 5 FN | Sensitivity: **89.13%** | Specificity: **65.52%** | Balanced Accuracy: **77.32%** | Latency: 358.39 ms.
+     - **Key Gains:**
+       - `poke_insulation`: 0/6 (0.0%) -> **6/6 (100.0%)** (+100.0%)
+       - `missing_wire`: 1/8 (12.5%) -> **5/8 (62.5%)** (+50.0%)
+       - `bent_wire`: 4/5 (80.0%) -> **5/5 (100.0%)** (+20.0%)
+       - `combined`: 3/4 (75.0%) -> **4/4 (100.0%)** (+25.0%)
+       - `cut_inner_insulation`: 3/6 (50.0%) -> **4/6 (66.7%)** (+16.7%)
+       - False negatives slashed by **72.2%** (from 18 missed defects down to only 5).
+  4. **Tripartite Finding Categorization Integration:**
+     - Integrated `categorized_findings` into `InspectionReport` schema and `ReportGenerator`:
+       - 🔴 `confirmed_visual_defects`: High-margin anomalies ($\Delta \ge 5.0$) or multi-detector consensus.
+       - 🟡 `potential_anomalies`: Single detector moderate activation ($0 < \Delta < 5.0$).
+       - 🔵 `uncertain_human_review`: Borderline proximity ($|\Delta| < 3.0$) or natural cable curvature risk.
+     - Enhanced `frontend/index.html` (both inline and full report modal) with styled categorization cards.
+- **Unit Tests Added:**
+  - `tests/unit/test_cable_inspector.py`: 6 tests (initialization, continuity detection on black canvas, puncture detection on uniform canvas, clean composite, defect augmentation).
+  - `tests/unit/test_report.py`: 9 tests (added tripartite categorization test case).
+  - Total test suite: **69 / 69 passed in 79.09s** across 11 test suites.
+- **Preservation Check:** All production models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.

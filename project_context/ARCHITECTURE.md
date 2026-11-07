@@ -69,7 +69,8 @@ The system is organized into decoupled layers: a thin HTTP API presentation laye
   - `model.py` (`PaDiM`, `AnomalyInspector`, `regions_from_map`, `save_overlay`, `validate_image`, `load_calibrated_threshold`). Production model architecture.
   - `registry.py` (`ModelRegistry`, `LRUModelCache`, `CategoryMetadata`). Manages lazy model loading, bounded RAM/VRAM footprint, and dynamic discovery.
   - `patchcore.py` (`PatchCore`). Experimental alternative model architecture implementing position-free nearest-neighbor memory banks for rotationally unconstrained or non-rigid industrial categories.
-- **Contract:** Isolates PyTorch, TorchVision, and Timm entirely from the API and agent. Produces a validated Pydantic `VisionResult` including `is_anomalous`, `threshold`, `verdict_mode` (`calibrated_raw` or `normalised`), `image_anomaly_score`, `raw_anomaly_score`, `regions` (list of `DefectRegion`), and `heatmap_path`.
+  - `cable_inspector.py` (`SpecializedCableInspector`, `ConductorContinuityDetector`, `SurfacePunctureDetector`, `CableSpecializedEvidence`). Multi-detector composite inspection engine addressing negative anomalies (missing conductors) and microscopic punctures (poke insulation).
+- **Contract:** Isolates PyTorch, TorchVision, and Timm entirely from the API and agent. Produces a validated Pydantic `VisionResult` including `is_anomalous`, `threshold`, `verdict_mode` (`calibrated_raw` or `normalised`), `image_anomaly_score`, `raw_anomaly_score`, `regions` (list of `DefectRegion`), `notes`, and `heatmap_path`.
 
 ### 2. Retrieval Layer (`src/app/retrieval/`)
 - **Key Modules:** `retriever.py` (`Retriever`), `ingest.py` (`ingest_documents`).
@@ -85,7 +86,7 @@ The system is organized into decoupled layers: a thin HTTP API presentation laye
 
 ### 5. Reporting Layer (`src/app/reporting/`)
 - **Key Modules:** `report.py` (`ReportGenerator`).
-- **Contract:** Takes accumulated evidence and structured findings, produces an evidence-grounded `InspectionReport` with distinct findings, recommendations, limitations, and mandatory safety disclaimer.
+- **Contract:** Takes accumulated evidence and structured findings, produces an evidence-grounded `InspectionReport` with distinct findings, recommendations, limitations, tripartite categorization (`confirmed_visual_defects`, `potential_anomalies`, `uncertain_human_review`), and mandatory safety disclaimer.
 
 ### 6. Presentation & API Layer (`src/app/api/`, `src/app/main.py`)
 - **Key Modules:** `routes.py`, `main.py`.

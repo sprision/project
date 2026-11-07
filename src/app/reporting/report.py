@@ -143,11 +143,68 @@ class ReportGenerator:
             limits.append("Deterministic generator; scores are model outputs, "
                           "not calibrated defect probabilities.")
 
+        # Structure findings into tripartite categorization:
+        # 1. Confirmed visual defects
+        # 2. Potential anomalies
+        # 3. Uncertain findings requiring human review
+        categorized_findings: dict[str, list[str]] = {
+            "confirmed_visual_defects": [],
+            "potential_anomalies": [],
+            "uncertain_human_review": [],
+        }
+
+        if vision is not None:
+            margin = abs(vision.raw_anomaly_score - vision.threshold) if (vision.threshold and vision.verdict_mode == "calibrated_raw") else 0.0
+            is_borderline = margin < 3.0 and vision.verdict_mode == "calibrated_raw"
+
+            if vision.is_anomalous:
+                if is_borderline:
+                    categorized_findings["uncertain_human_review"].append(
+                        f"Borderline anomaly score ({vision.raw_anomaly_score:.2f} vs threshold {vision.threshold:.2f}); "
+                        f"lies within {margin:.2f} points of decision boundary and requires human inspector review."
+                    )
+                elif vision.raw_anomaly_score >= (vision.threshold + 5.0):
+                    categorized_findings["confirmed_visual_defects"].append(
+                        f"High-margin anomaly confirmed: raw score {vision.raw_anomaly_score:.2f} ≥ "
+                        f"threshold {vision.threshold:.2f} (+{vision.raw_anomaly_score - vision.threshold:.2f} delta) "
+                        f"with {len(vision.regions)} candidate defect region(s)."
+                    )
+                else:
+                    categorized_findings["potential_anomalies"].append(
+                        f"Potential anomaly detected: raw score {vision.raw_anomaly_score:.2f} ≥ "
+                        f"threshold {vision.threshold:.2f} with {len(vision.regions)} candidate defect region(s)."
+                    )
+            else:
+                if is_borderline:
+                    categorized_findings["uncertain_human_review"].append(
+                        f"Borderline normal sample ({vision.raw_anomaly_score:.2f} vs threshold {vision.threshold:.2f}); "
+                        f"close proximity to boundary warrants secondary visual verification."
+                    )
+
+            # Categorize specialized detector findings from notes
+            for note in vision.notes:
+                if "Specialized detector" in note:
+                    categorized_findings["confirmed_visual_defects"].append(note)
+
+        # Categorize other evidence items
+        for f in findings:
+            st = f.statement
+            st_low = st.lower()
+            if "confirmed" in st_low:
+                if st not in categorized_findings["confirmed_visual_defects"]:
+                    categorized_findings["confirmed_visual_defects"].append(st)
+            elif "uncertain" in st_low or "borderline" in st_low or "review" in st_low:
+                if st not in categorized_findings["uncertain_human_review"]:
+                    categorized_findings["uncertain_human_review"].append(st)
+            elif f.kind == EvidenceKind.HYPOTHESIS or "potential" in st_low or "anomaly" in st_low:
+                if st not in categorized_findings["potential_anomalies"]:
+                    categorized_findings["potential_anomalies"].append(st)
+
         return InspectionReport(
             image_id=image_id, question=question, summary=summary,
             findings=findings, recommendations=recs, limitations=limits,
             vision=vision, retrieval=retrieval, generator="deterministic",
-            trace=trace)
+            trace=trace, categorized_findings=categorized_findings)
 
     # ---------------- optional LLM ----------------
     def _llm_report(self, image_id, question, vision, retrieval,

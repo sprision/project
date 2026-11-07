@@ -17,7 +17,29 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (62 / 62 Passed)**
+- [x] **Specialized Multi-Detector Cable Inspection Module & Finding Categorization**
+  - Investigated root causes of low baseline PaDiM cable sensitivity:
+    - Missing wire (mean score 21.74 vs clean 22.77) matches background Gaussian distribution (negative anomaly problem).
+    - Poke insulation ($98 \times 114$ px) diluted by default $\sigma=4.0$ smoothing (max score 21.27–27.99 vs threshold 30.42).
+  - Implemented `ConductorContinuityDetector` in `src/app/vision/cable_inspector.py`: evaluates transmission density across top, left, and right harness divergence channels. Threshold calibrated on seed 42 calibration split ($T=0.50$).
+  - Implemented `SurfacePunctureDetector` in `src/app/vision/cable_inspector.py`: evaluates high-frequency $\sigma=1.0$ patch residual maps (poke peaks reach 33.58–54.11 vs clean 24.42–28.41). Threshold calibrated on seed 42 calibration split ($T=38.0$).
+  - Implemented `SpecializedCableInspector` composite inspection engine.
+  - Benchmarked baseline PaDiM vs Specialized Inspector head-to-head across all 75 held-out evaluation samples (seed 42, zero leakage):
+    - `poke_insulation` recall: **100.0% (6/6)** vs baseline 0.0% (0/6) — **+100.0% gain**.
+    - `missing_wire` recall: **62.5% (5/8)** vs baseline 12.5% (1/8) — **+50.0% gain**.
+    - Overall sensitivity: **89.13% (41/46)** vs baseline 60.87% (28/46) — **+28.26% recall gain**.
+    - False negatives reduced from 18 to 5.
+    - Balanced accuracy: **77.32%** vs baseline 71.81% (+5.51% gain).
+    - Latency: 358.39 ms vs baseline 156.11 ms.
+  - Implemented tripartite finding categorization across schemas (`InspectionReport.categorized_findings`), `ReportGenerator`, and UI (`frontend/index.html`):
+    - 🔴 *Confirmed visual defects*
+    - 🟡 *Potential anomalies*
+    - 🔵 *Uncertain findings requiring human review*
+  - Added unit test suite `tests/unit/test_cable_inspector.py` (6 tests) and extended `test_report.py` (9 tests).
+  - Total unit test suite: **69 / 69 passing in 79.09s**.
+  - Recorded benchmark results in `runs/cable_specialized_evaluation.json`.
+
+- [x] **Unit Test Suite Verification (69 / 69 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)

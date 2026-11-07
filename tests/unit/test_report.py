@@ -101,3 +101,36 @@ def test_borderline_score_generates_human_review_recommendation(tmp_workspace):
     assert any("Borderline score proximity" in lim for lim in rep.limitations)
     assert any("Cable category exhibits documented score overlap" in lim for lim in rep.limitations)
 
+
+def test_categorized_findings_tripartite_structure(tmp_workspace):
+    """Verify that findings are structured into confirmed defects, potential anomalies, and uncertain review."""
+    # 1. Borderline sample -> uncertain_human_review
+    v_border = VisionResult(
+        image_id="borderline_cable", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.55, raw_anomaly_score=31.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep_border = ReportGenerator().generate("borderline_cable", "defect?", v_border, None, [], [])
+    assert "categorized_findings" in rep_border.model_dump()
+    assert len(rep_border.categorized_findings["uncertain_human_review"]) >= 1
+
+    # 2. High-margin anomalous sample -> confirmed_visual_defects
+    v_confirmed = VisionResult(
+        image_id="severed_cable", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.95, raw_anomaly_score=45.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in left."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep_conf = ReportGenerator().generate("severed_cable", "defect?", v_confirmed, None, [], [])
+    assert len(rep_conf.categorized_findings["confirmed_visual_defects"]) >= 1
+    assert any("conductor_continuity_detector" in s for s in rep_conf.categorized_findings["confirmed_visual_defects"])
+
+    # 3. Moderate margin sample -> potential_anomalies
+    v_pot = VisionResult(
+        image_id="minor_cable", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.60, raw_anomaly_score=34.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep_pot = ReportGenerator().generate("minor_cable", "defect?", v_pot, None, [], [])
+    assert len(rep_pot.categorized_findings["potential_anomalies"]) >= 1
+

@@ -11,6 +11,12 @@
   - `data/index/vision/screw/padim.pkl` (662 MB) — Exists, verified.
 - **Experimental Models & Benchmarking:**
   - `src/app/vision/patchcore.py`: Experimental PatchCore architecture featuring ResNet-18 layer2+3 patch representations and memory-bank nearest-neighbor scoring.
+  - `src/app/vision/cable_inspector.py`: Specialized multi-detector cable inspection architecture integrating `ConductorContinuityDetector` and `SurfacePunctureDetector`.
+  - Head-to-head cable evaluation recorded in `runs/cable_specialized_evaluation.json`:
+    - `poke_insulation` recall boosted from **0.0% to 100.0%** (+100.0% gain).
+    - `missing_wire` recall boosted from **12.5% to 62.5%** (+50.0% gain).
+    - Overall cable sensitivity increased from **60.87% to 89.13% (+28.26% gain)** on strict held-out split (41/46 detected vs baseline 28/46).
+    - Balanced accuracy increased from 71.81% to 77.32%.
   - Empirical comparison documented in `runs/experimental_benchmarks.json`:
     - On held-out screw evaluation, PatchCore increases specificity from 28.57% (PaDiM) to **47.62%** and reduces FPR from 71.43% to **52.38%** (Pixel AUROC = 0.9709).
     - Rotation-normalized PaDiM evaluated: in-plane 2D alignment collapsed held-out AUROC to 0.4374 and sensitivity to 1.69% due to border padding, 180° flip ambiguity, and unresolved 3D helical roll angle.
@@ -101,26 +107,24 @@
 - **Decision-Support Enhancements:**
   - Persistent global authority notice banner establishing decision-support boundaries (not an autonomous quality authority).
   - Explicit non-probabilistic score presentation: raw Mahalanobis distances and threshold margins clearly explained.
+  - Tripartite finding classification across report schemas and dashboard: *Confirmed visual defects* (red), *Potential anomalies* (amber), and *Uncertain findings requiring human review* (blue).
   - Category benchmark reliability pills (`bottle`: high, `metal_nut`: high, `cable`: moderate with documented overlap).
   - Automated borderline score warning cards ($|raw - threshold| < 3.0$) mandating secondary human visual review.
   - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 62 / 62 passing unit tests across all 10 test suites:
+- **Status:** 69 / 69 passing unit tests across all 11 test suites (79.09s total runtime):
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
   - `test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
   - `test_patchcore.py`: 4 passed (initialization, embedding shapes, fit memory bank, anomaly map, save/load cycle)
-  - `test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, and category limitations)
+  - `test_cable_inspector.py`: 6 passed (conductor continuity detector, surface puncture detector, composite inspection, finding categorization)
+  - `test_report.py`: 9 passed (regression tests for dict retrieval, borderline score warnings, category limitations, tripartite finding categorization)
   - `test_vision_validation.py`: 5 passed
   - `test_threshold_calibration.py`: 12 passed (disjoint split verification, certified sample counts, calibrated threshold presence, metric arithmetic, seeded reproducibility)
   - `test_retriever.py`: 4 passed
-  - `test_agent.py`: 10 passed
-  - `test_vision_validation.py`: 5 passed
-  - `test_threshold_calibration.py`: 10 passed (calibration threshold presence, metric arithmetic, disjoint split partitioning, seeded reproducibility)
-  - `test_retriever.py`: 4 passed
-  - `test_agent.py`: 10 passed (regression test for agent report generation tool with dict retrieval)
+  - `test_agent.py`: 10 passed (agent loop with dict retrieval and tool dispatch)
 
 ### 10. Deployment Strategy
 - **Status:** Complete.

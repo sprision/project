@@ -1135,6 +1135,44 @@ function renderInspectionResults(rep) {
     <p style="font-size:14px;line-height:1.7;color:var(--text-secondary)">${rep.summary}</p>
   </div>`;
 
+  // Categorized Findings (Confirmed visual defects, Potential anomalies, Uncertain human review)
+  if (rep.categorized_findings) {
+    const cf = rep.categorized_findings;
+    const hasAny = (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) ||
+                   (cf.potential_anomalies && cf.potential_anomalies.length) ||
+                   (cf.uncertain_human_review && cf.uncertain_human_review.length);
+    if (hasAny) {
+      html += `<div class="card animate-in delay-2" style="margin-bottom:16px">
+        <div class="card-header"><div class="card-title"><span class="icon">⚖️</span> Categorized Defect & Uncertainty Analysis</div></div>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">`;
+      if (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CONFIRMED VISUAL DEFECTS (${cf.confirmed_visual_defects.length})</div>`;
+        cf.confirmed_visual_defects.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      if (cf.potential_anomalies && cf.potential_anomalies.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
+        cf.potential_anomalies.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cf.uncertain_human_review.length})</div>`;
+        cf.uncertain_human_review.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div></div>`;
+    }
+  }
+
   // Findings
   if (rep.findings && rep.findings.length) {
     html += `<div class="card animate-in delay-2" style="margin-bottom:16px">
@@ -1297,6 +1335,42 @@ function renderFullReport(rep) {
   // Summary
   html += `<div class="report-section"><h4><span>📝</span> Summary</h4>
     <div class="card"><p style="line-height:1.8">${rep.summary}</p></div></div>`;
+
+  // Categorized Findings (Modal)
+  if (rep.categorized_findings) {
+    const cf = rep.categorized_findings;
+    const hasAny = (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) ||
+                   (cf.potential_anomalies && cf.potential_anomalies.length) ||
+                   (cf.uncertain_human_review && cf.uncertain_human_review.length);
+    if (hasAny) {
+      html += `<div class="report-section"><h4><span>⚖️</span> Categorized Defect & Uncertainty Analysis</h4><div class="card"><div style="display:flex;flex-direction:column;gap:10px">`;
+      if (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CONFIRMED VISUAL DEFECTS (${cf.confirmed_visual_defects.length})</div>`;
+        cf.confirmed_visual_defects.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      if (cf.potential_anomalies && cf.potential_anomalies.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
+        cf.potential_anomalies.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cf.uncertain_human_review.length})</div>`;
+        cf.uncertain_human_review.forEach(s => {
+          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div></div></div>`;
+    }
+  }
 
   // Findings
   if (rep.findings.length) {

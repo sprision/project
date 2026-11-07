@@ -97,6 +97,13 @@ class InspectionReport(BaseModel):
     retrieval: RetrievalResult | None
     generator: str                            # "deterministic" | "openai" | ...
     trace: list[dict[str, Any]] = Field(default_factory=list)  # agent tool calls
+    categorized_findings: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "confirmed_visual_defects": [],
+            "potential_anomalies": [],
+            "uncertain_human_review": [],
+        }
+    )
     disclaimer: str = (
         "Decision support only. Not an authorisation to operate, repair or shut "
         "down equipment. Findings are hypotheses, not confirmed diagnoses."
