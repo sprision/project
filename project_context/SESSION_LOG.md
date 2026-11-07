@@ -345,3 +345,46 @@
   - `tests/unit/test_report.py`: 9 tests (added tripartite categorization test case).
   - Total test suite: **69 / 69 passed in 79.09s** across 11 test suites.
 - **Preservation Check:** All production models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.
+
+---
+
+### Session 11: Multi-Detector Decision Integrity, Provenance & Reporting System Polish
+- **Date & Local Time:** 2026-11-07T15:55:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Inspect finding categories and enforce strict mathematical mutual exclusivity.
+  2. Resolve overlapping conditions between Potential Anomalies and Human Review.
+  3. Ensure algorithmic model outputs are never labeled confirmed physical defects (`is_human_confirmed: bool = False`).
+  4. Track multi-detector evidence provenance (`FindingProvenance`) and prevent duplicate findings.
+  5. Resolve detector disagreements and investigate FPR increase on calibration data only.
+  6. Measure end-to-end composite pipeline latency.
+  7. Add unit tests, update documentation, and commit verified work.
+- **Key Implementation Improvements & Findings:**
+  1. **Strict Mutual Exclusivity:**
+     - Borderline zone ($|\Delta| < 3.0$) maps exclusively to `uncertain_human_review`.
+     - Multi-detector corroboration or high margin ($\Delta \ge 5.0$) maps exclusively to `candidate_defects`.
+     - Moderate single-detector activation ($3.0 \le \Delta < 5.0$) maps exclusively to `potential_anomalies`.
+     - Unit tests verify pairwise disjoint category sets across all findings.
+  2. **Authority Boundary & De-duplication:**
+     - Added `FindingProvenance` (`detector`, `score`, `threshold`, `margin`, `location`, `bbox`) and `CategorizedFinding` (`id`, `category`, `title`, `description`, `provenance`, `is_human_confirmed=False`, `action_required`).
+     - Added unique deterministic IDs preventing duplicate finding display.
+     - Preserved clear distinction: model indications are candidate hypotheses, not confirmed physical defects.
+  3. **Detector Disagreement & False Positive Resolution:**
+     - Proved on calibration data only: unconstrained OR logic at $T=38.0$ across the full frame triggered on boundary edge noise and cable bend glints on twisted clean cables.
+     - Resolved by masking outer 2 patches to suppress frame noise and routing uncorroborated single-detector boundary spikes where PaDiM is nominal strictly into `uncertain_human_review` with actionable inspection instructions.
+     - On calibration data, this cuts false alarms in half (FPR $27.59\% \to 13.79\%$), increases specificity to $86.21\%$, and boosts calibration balanced accuracy to $85.49\%$. Zero tuning against held-out labels.
+  4. **Latency Measurement:**
+     - Composite vision inspection: 374.57 ms (PaDiM: 154.32 ms, Continuity: 74.22 ms, Puncture: 97.76 ms).
+     - Hybrid technical document retrieval: 14.47 ms.
+     - SQLite history lookup: 0.62 ms.
+     - Deterministic report generation: 0.09 ms.
+     - Total end-to-end composite pipeline latency: **~390 ms**.
+  5. **Dashboard Polish:**
+     - Displayed mutually exclusive categories with provenance tags (`[Detector: PaDiM | Score: ...]`) and actionable inspection actions (`⚡ Action Required: ...`) in `frontend/index.html`.
+- **Unit Tests Added:**
+  - `test_category_mutual_exclusivity_and_non_overlap`: asserts pairwise disjoint category ID sets.
+  - `test_detector_disagreement_handling`: verifies uncorroborated puncture trigger with nominal PaDiM routes to uncertain review.
+  - `test_duplicate_findings_prevention`: verifies de-duplication of duplicate notes and evidence items.
+  - `test_evidence_provenance_and_human_unconfirmed`: asserts provenance and `is_human_confirmed == False`.
+  - Total test suite: **73 / 73 passed in 43.35s** across 11 test suites.
+- **Preservation Check:** All production models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.

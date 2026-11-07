@@ -86,7 +86,11 @@ The system is organized into decoupled layers: a thin HTTP API presentation laye
 
 ### 5. Reporting Layer (`src/app/reporting/`)
 - **Key Modules:** `report.py` (`ReportGenerator`).
-- **Contract:** Takes accumulated evidence and structured findings, produces an evidence-grounded `InspectionReport` with distinct findings, recommendations, limitations, tripartite categorization (`confirmed_visual_defects`, `potential_anomalies`, `uncertain_human_review`), and mandatory safety disclaimer.
+- **Data Models:** `CategorizedFinding`, `FindingProvenance`, `InspectionReport`.
+- **Contract:** Takes accumulated evidence and structured findings, produces an evidence-grounded `InspectionReport` with:
+  - `structured_findings`: list of `CategorizedFinding` with unique IDs (preventing duplicate display), exact detector provenance (`detector`, `score`, `threshold`, `margin`, `location`, `bbox`), `is_human_confirmed=False` (never asserting confirmed physical defect without manual sign-off), and actionable review instructions (`action_required`).
+  - `categorized_findings`: deterministic, mutually exclusive tripartite buckets (`candidate_defects`, `potential_anomalies`, `uncertain_human_review`).
+  - Distinct recommendations, limitations, and mandatory safety disclaimer.
 
 ### 6. Presentation & API Layer (`src/app/api/`, `src/app/main.py`)
 - **Key Modules:** `routes.py`, `main.py`.

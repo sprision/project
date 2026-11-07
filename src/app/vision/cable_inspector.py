@@ -158,10 +158,17 @@ class SurfacePunctureDetector:
 
         # Local high-frequency map with light smoothing (sigma=1.0)
         s1_map = gaussian_filter(raw_map, sigma=1.0)
-        max_s1 = float(s1_map.max())
+        # Suppress outer boundary patches (2 patches ~ 16px) to eliminate framing edge noise
+        s1_interior = s1_map.copy()
+        s1_interior[:2, :] = 0.0
+        s1_interior[-2:, :] = 0.0
+        s1_interior[:, :2] = 0.0
+        s1_interior[:, -2:] = 0.0
+
+        max_s1 = float(s1_interior.max())
 
         # Find location of peak high-frequency score
-        py, px = np.unravel_index(np.argmax(s1_map), s1_map.shape)
+        py, px = np.unravel_index(np.argmax(s1_interior), s1_interior.shape)
         # Convert 64x64 patch coordinates to 1024x1024 image coordinates
         scale = 1024.0 / h
         cx, cy = int(px * scale), int(py * scale)

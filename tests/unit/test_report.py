@@ -134,3 +134,90 @@ def test_categorized_findings_tripartite_structure(tmp_workspace):
     rep_pot = ReportGenerator().generate("minor_cable", "defect?", v_pot, None, [], [])
     assert len(rep_pot.categorized_findings["potential_anomalies"]) >= 1
 
+
+def test_category_mutual_exclusivity_and_non_overlap(tmp_workspace):
+    """Verify that findings are strictly mutually exclusive and non-overlapping."""
+    v = VisionResult(
+        image_id="cable_test_exclusivity", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.90, raw_anomaly_score=42.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in left."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep = ReportGenerator().generate("cable_test_exclusivity", "defect?", v, None, [], [])
+
+    # Verify structured findings exist
+    assert len(rep.structured_findings) > 0
+    # Collect IDs in each category
+    by_cat = {}
+    for sf in rep.structured_findings:
+        by_cat.setdefault(sf.category, set()).add(sf.id)
+
+    # Assert pairwise disjoint
+    categories = list(by_cat.keys())
+    for i in range(len(categories)):
+        for j in range(i + 1, len(categories)):
+            c1, c2 = categories[i], categories[j]
+            assert by_cat[c1].isdisjoint(by_cat[c2]), f"Categories {c1} and {c2} overlap!"
+
+
+def test_detector_disagreement_handling(tmp_workspace):
+    """Verify that when detectors disagree (PaDiM normal vs Puncture detector), it routes to uncertain human review."""
+    v_disagree = VisionResult(
+        image_id="cable_disagree", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.20, raw_anomaly_score=26.5,
+        is_anomalous=False, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'surface_puncture_detector' detected surface puncture (score 39.20 >= 38.00)."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep = ReportGenerator().generate("cable_disagree", "defect?", v_disagree, None, [], [])
+
+    # The puncture disagreement must be in uncertain_human_review, NOT a candidate defect
+    unc_findings = [f for f in rep.structured_findings if f.category == "uncertain_human_review"]
+    assert len(unc_findings) >= 1
+    punc_finding = next(f for f in unc_findings if f.provenance.detector == "SurfacePunctureDetector")
+    assert "Detector Disagreement" in punc_finding.title
+    assert punc_finding.action_required is not None
+    assert "Action Required" in punc_finding.action_required
+    assert punc_finding.is_human_confirmed is False
+
+
+def test_duplicate_findings_prevention(tmp_workspace):
+    """Verify that duplicate notes or evidence items are never duplicated in structured findings."""
+    v = VisionResult(
+        image_id="cable_dup", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.90, raw_anomaly_score=42.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        notes=[
+            "Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in left.",
+            "Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in left.",
+        ],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    evidence = [
+        EvidenceItem(kind=EvidenceKind.VISUAL_OBSERVATION, statement="Duplicate observation statement"),
+        EvidenceItem(kind=EvidenceKind.VISUAL_OBSERVATION, statement="Duplicate observation statement"),
+    ]
+    rep = ReportGenerator().generate("cable_dup", "defect?", v, None, evidence, [])
+
+    # Verify no duplicate finding IDs
+    ids = [sf.id for sf in rep.structured_findings]
+    assert len(ids) == len(set(ids)), f"Duplicate finding IDs found: {ids}"
+
+
+def test_evidence_provenance_and_human_unconfirmed(tmp_workspace):
+    """Verify every finding retains detector provenance and is never labeled confirmed physical defect."""
+    v = VisionResult(
+        image_id="cable_prov", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.90, raw_anomaly_score=42.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in left."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep = ReportGenerator().generate("cable_prov", "defect?", v, None, [], [])
+
+    for sf in rep.structured_findings:
+        # Check provenance
+        assert sf.provenance is not None
+        assert sf.provenance.detector != ""
+        # Check distinction: algorithmic prediction is NOT human-confirmed
+        assert sf.is_human_confirmed is False
+        assert "Confirmed Physical Defect" not in sf.title
+
+

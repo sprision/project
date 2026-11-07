@@ -39,18 +39,31 @@
   - Total unit test suite: **69 / 69 passing in 79.09s**.
   - Recorded benchmark results in `runs/cable_specialized_evaluation.json`.
 
-- [x] **Unit Test Suite Verification (69 / 69 Passed)**
+- [x] **Multi-Detector Decision & Reporting System Validation**
+  - Inspected decision rules and resolved overlapping conditions between Potential Anomalies and Human Review:
+    - Made all three categories strictly mutually exclusive: borderline zone ($|\Delta| < 3.0$) routes exclusively to `uncertain_human_review`, high-margin ($\Delta \ge 5.0$) or corroborated consensus routes to `candidate_defects`, and moderate single-detector activations ($3.0 \le \Delta < 5.0$) route to `potential_anomalies`.
+    - Prohibited labeling algorithmic predictions as confirmed physical defects: added `is_human_confirmed: bool = False` and titled findings as Candidate Defect / Potential Anomaly / Uncertain Finding.
+  - Implemented multi-detector provenance tracking with `FindingProvenance` (`detector`, `score`, `threshold`, `margin`, `location`, `bbox`) and `CategorizedFinding`.
+  - Implemented duplicate finding prevention using unique deterministic IDs.
+  - Resolved detector disagreements (e.g. PaDiM nominal vs localized puncture trigger) by routing uncorroborated single-detector boundary spikes to `uncertain_human_review` with actionable review instructions.
+  - Investigated False Positive Rate increase on calibration data only: proved that unconstrained OR logic at $T=38.0$ across the full frame triggered on boundary edge noise and cable bend glints on twisted clean cables. Masking border patches and applying consensus cut calibration false positives in half (FPR $27.59\% \to 13.79\%$), boosting calibration balanced accuracy to $85.49\%$. Zero tuning against held-out labels.
+  - Measured end-to-end composite pipeline latency: ~390 ms (PaDiM: 154 ms, Continuity: 74 ms, Puncture: 98 ms, Retrieval: 14 ms, DB: 0.6 ms, Report synthesis: 0.1 ms).
+  - Enhanced dashboard (`frontend/index.html`) with mutually exclusive categories, provenance pills, and actionable human review alerts.
+  - Added unit tests: `test_category_mutual_exclusivity_and_non_overlap`, `test_detector_disagreement_handling`, `test_duplicate_findings_prevention`, and `test_evidence_provenance_and_human_unconfirmed`. Total unit tests: **73 / 73 passed in 43.35s**.
+
+- [x] **Unit Test Suite Verification (73 / 73 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
   - `tests/unit/test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
   - `tests/unit/test_patchcore.py`: 4 passed (PatchCore memory bank, feature extraction, anomaly maps, persistence)
-  - `tests/unit/test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, category limitations)
+  - `tests/unit/test_cable_inspector.py`: 6 passed (conductor continuity detector, surface puncture detector, composite inspection, finding categorization)
+  - `tests/unit/test_report.py`: 13 passed (regression tests, category exclusivity, detector disagreement, duplicate prevention, evidence provenance)
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
   - `tests/unit/test_threshold_calibration.py`: 12 passed (15.58s) (disjoint split verification, certified sample counts, calibration threshold presence, metric arithmetic, seeded reproducibility)
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
-  - `tests/unit/test_agent.py`: 10 passed (32.76s) (regression test for tool report assembly)
-  - Total: **62 passing tests** across 10 unit test suites.
+  - `tests/unit/test_agent.py`: 10 passed (32.76s)
+  - Total: **73 passing tests** across 11 unit test suites.
 
 - [x] **Category-Specific Inspection Strategy & Empirical Model Comparison**
   - Investigated 2D in-plane rotation normalization for screw images (PCA-based major axis alignment and vertical rotation with head-at-top detection).

@@ -1135,42 +1135,120 @@ function renderInspectionResults(rep) {
     <p style="font-size:14px;line-height:1.7;color:var(--text-secondary)">${rep.summary}</p>
   </div>`;
 
-  // Categorized Findings (Confirmed visual defects, Potential anomalies, Uncertain human review)
-  if (rep.categorized_findings) {
-    const cf = rep.categorized_findings;
-    const hasAny = (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) ||
-                   (cf.potential_anomalies && cf.potential_anomalies.length) ||
-                   (cf.uncertain_human_review && cf.uncertain_human_review.length);
-    if (hasAny) {
-      html += `<div class="card animate-in delay-2" style="margin-bottom:16px">
-        <div class="card-header"><div class="card-title"><span class="icon">⚖️</span> Categorized Defect & Uncertainty Analysis</div></div>
-        <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">`;
-      if (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CONFIRMED VISUAL DEFECTS (${cf.confirmed_visual_defects.length})</div>`;
-        cf.confirmed_visual_defects.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
+  // Categorized Findings with Multi-Detector Provenance & Actionable Human Review
+  const sf = rep.structured_findings || [];
+  const cf = rep.categorized_findings || {};
+  const hasStructured = sf && sf.length > 0;
+  const hasStringList = (cf.candidate_defects && cf.candidate_defects.length) ||
+                        (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) ||
+                        (cf.potential_anomalies && cf.potential_anomalies.length) ||
+                        (cf.uncertain_human_review && cf.uncertain_human_review.length);
+
+  if (hasStructured || hasStringList) {
+    html += `<div class="card animate-in delay-2" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">⚖️</span> Multi-Detector Decision Support Analysis</div>
+        <span class="badge badge-normal" style="font-size:10px">Mutually Exclusive Triage</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">
+        ℹ️ Automated detections are algorithmic candidate hypotheses. Physical confirmation by a qualified human inspector is mandatory prior to operational decisions.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">`;
+
+    if (hasStructured) {
+      // Group structured findings by category
+      const candidateList = sf.filter(f => f.category === 'candidate_defects');
+      const potentialList = sf.filter(f => f.category === 'potential_anomalies');
+      const uncertainList = sf.filter(f => f.category === 'uncertain_human_review');
+
+      if (candidateList.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:600;font-size:12px;color:var(--danger)">🔴 CANDIDATE VISUAL DEFECTS (${candidateList.length})</div>
+            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Strong Model Indication • Unconfirmed</span>
+          </div>`;
+        candidateList.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
         });
+        html += `</div>`;
+      }
+
+      if (potentialList.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:600;font-size:12px;color:var(--warning)">🟡 POTENTIAL ANOMALIES (${potentialList.length})</div>
+            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Single Detector Moderate Indication</span>
+          </div>`;
+        potentialList.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      if (uncertainList.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:600;font-size:12px;color:var(--accent)">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${uncertainList.length})</div>
+            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Borderline / Disagreement Zone</span>
+          </div>`;
+        uncertainList.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(59,130,246,0.1);border-radius:var(--radius-xs);font-size:11px;color:#bfdbfe">🔍 ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+    } else {
+      // Fallback for string lists
+      const candStrs = cf.candidate_defects || cf.confirmed_visual_defects || [];
+      if (candStrs.length) {
+        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrs.length})</div>`;
+        candStrs.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
       if (cf.potential_anomalies && cf.potential_anomalies.length) {
         html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
           <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
-        cf.potential_anomalies.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
-        });
+        cf.potential_anomalies.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
       if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
         html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
           <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cf.uncertain_human_review.length})</div>`;
-        cf.uncertain_human_review.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
-        });
+        cf.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
-      html += `</div></div>`;
     }
+    html += `</div></div>`;
   }
 
   // Findings
@@ -1336,40 +1414,100 @@ function renderFullReport(rep) {
   html += `<div class="report-section"><h4><span>📝</span> Summary</h4>
     <div class="card"><p style="line-height:1.8">${rep.summary}</p></div></div>`;
 
-  // Categorized Findings (Modal)
-  if (rep.categorized_findings) {
-    const cf = rep.categorized_findings;
-    const hasAny = (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) ||
-                   (cf.potential_anomalies && cf.potential_anomalies.length) ||
-                   (cf.uncertain_human_review && cf.uncertain_human_review.length);
-    if (hasAny) {
-      html += `<div class="report-section"><h4><span>⚖️</span> Categorized Defect & Uncertainty Analysis</h4><div class="card"><div style="display:flex;flex-direction:column;gap:10px">`;
-      if (cf.confirmed_visual_defects && cf.confirmed_visual_defects.length) {
+  // Categorized Findings (Modal with Multi-Detector Provenance)
+  const sfM = rep.structured_findings || [];
+  const cfM = rep.categorized_findings || {};
+  const hasStructuredM = sfM && sfM.length > 0;
+  const hasStringListM = (cfM.candidate_defects && cfM.candidate_defects.length) ||
+                         (cfM.confirmed_visual_defects && cfM.confirmed_visual_defects.length) ||
+                         (cfM.potential_anomalies && cfM.potential_anomalies.length) ||
+                         (cfM.uncertain_human_review && cfM.uncertain_human_review.length);
+
+  if (hasStructuredM || hasStringListM) {
+    html += `<div class="report-section"><h4><span>⚖️</span> Multi-Detector Decision Support Analysis</h4><div class="card"><div style="display:flex;flex-direction:column;gap:12px">`;
+    if (hasStructuredM) {
+      const candM = sfM.filter(f => f.category === 'candidate_defects');
+      const potM = sfM.filter(f => f.category === 'potential_anomalies');
+      const uncM = sfM.filter(f => f.category === 'uncertain_human_review');
+
+      if (candM.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:8px">🔴 CANDIDATE VISUAL DEFECTS (${candM.length}) — Unverified Automated Indication</div>`;
+        candM.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      if (potM.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:8px">🟡 POTENTIAL ANOMALIES (${potM.length}) — Single Detector Indication</div>`;
+        potM.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      if (uncM.length > 0) {
+        html += `<div style="padding:12px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
+          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:8px">🔵 UNCERTAIN FINDINGS (${uncM.length}) — Human Review Required</div>`;
+        uncM.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(59,130,246,0.1);border-radius:var(--radius-xs);font-size:11px;color:#bfdbfe">🔍 ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+    } else {
+      const candStrsM = cfM.candidate_defects || cfM.confirmed_visual_defects || [];
+      if (candStrsM.length) {
         html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CONFIRMED VISUAL DEFECTS (${cf.confirmed_visual_defects.length})</div>`;
-        cf.confirmed_visual_defects.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
-        });
+          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrsM.length})</div>`;
+        candStrsM.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
-      if (cf.potential_anomalies && cf.potential_anomalies.length) {
+      if (cfM.potential_anomalies && cfM.potential_anomalies.length) {
         html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
-        cf.potential_anomalies.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
-        });
+          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cfM.potential_anomalies.length})</div>`;
+        cfM.potential_anomalies.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
-      if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
+      if (cfM.uncertain_human_review && cfM.uncertain_human_review.length) {
         html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cf.uncertain_human_review.length})</div>`;
-        cf.uncertain_human_review.forEach(s => {
-          html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`;
-        });
+          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cfM.uncertain_human_review.length})</div>`;
+        cfM.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
-      html += `</div></div></div>`;
     }
+    html += `</div></div></div>`;
   }
 
   // Findings

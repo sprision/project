@@ -9,8 +9,9 @@ same evidence is rendered by the model under an explicit grounding instruction
 from __future__ import annotations
 
 from ..config import get_settings
-from ..schemas import (EvidenceItem, EvidenceKind, InspectionReport,
-                       RetrievalResult, VisionResult)
+from ..schemas import (CategorizedFinding, EvidenceItem, EvidenceKind,
+                       FindingProvenance, InspectionReport, RetrievalResult,
+                       VisionResult)
 
 
 class ReportGenerator:
@@ -143,68 +144,195 @@ class ReportGenerator:
             limits.append("Deterministic generator; scores are model outputs, "
                           "not calibrated defect probabilities.")
 
-        # Structure findings into tripartite categorization:
-        # 1. Confirmed visual defects
-        # 2. Potential anomalies
-        # 3. Uncertain findings requiring human review
+        # Multi-detector finding categorization with strict mutual exclusivity,
+        # duplicate prevention, and detector provenance tracking.
+        seen_finding_ids: set[str] = set()
+        structured_findings: list[CategorizedFinding] = []
         categorized_findings: dict[str, list[str]] = {
-            "confirmed_visual_defects": [],
+            "candidate_defects": [],
+            "confirmed_visual_defects": [],  # Backwards-compatibility alias for candidate_defects
             "potential_anomalies": [],
             "uncertain_human_review": [],
         }
 
-        if vision is not None:
-            margin = abs(vision.raw_anomaly_score - vision.threshold) if (vision.threshold and vision.verdict_mode == "calibrated_raw") else 0.0
-            is_borderline = margin < 3.0 and vision.verdict_mode == "calibrated_raw"
+        def add_finding(
+            finding_id: str,
+            category: str,
+            title: str,
+            description: str,
+            provenance: FindingProvenance,
+            action_required: str | None = None,
+        ) -> None:
+            """Register a finding into EXACTLY ONE category without duplication."""
+            if finding_id in seen_finding_ids:
+                return
+            seen_finding_ids.add(finding_id)
+            cf = CategorizedFinding(
+                id=finding_id,
+                category=category,
+                title=title,
+                description=description,
+                provenance=provenance,
+                is_human_confirmed=False,  # Algorithmic prediction is unconfirmed until physical verification
+                action_required=action_required,
+            )
+            structured_findings.append(cf)
+            if category in categorized_findings:
+                categorized_findings[category].append(description)
+            if category == "candidate_defects":
+                categorized_findings["confirmed_visual_defects"].append(description)
 
-            if vision.is_anomalous:
-                if is_borderline:
-                    categorized_findings["uncertain_human_review"].append(
-                        f"Borderline anomaly score ({vision.raw_anomaly_score:.2f} vs threshold {vision.threshold:.2f}); "
-                        f"lies within {margin:.2f} points of decision boundary and requires human inspector review."
-                    )
-                elif vision.raw_anomaly_score >= (vision.threshold + 5.0):
-                    categorized_findings["confirmed_visual_defects"].append(
-                        f"High-margin anomaly confirmed: raw score {vision.raw_anomaly_score:.2f} ≥ "
-                        f"threshold {vision.threshold:.2f} (+{vision.raw_anomaly_score - vision.threshold:.2f} delta) "
-                        f"with {len(vision.regions)} candidate defect region(s)."
+        if vision is not None:
+            score = float(vision.raw_anomaly_score)
+            threshold = float(vision.threshold) if vision.threshold else 0.0
+            margin = score - threshold if vision.verdict_mode == "calibrated_raw" else (float(vision.image_anomaly_score) - threshold)
+            is_borderline = abs(margin) < 3.0 and vision.verdict_mode == "calibrated_raw"
+
+            has_continuity_note = any("conductor_continuity_detector" in n for n in vision.notes)
+            has_puncture_note = any("surface_puncture_detector" in n for n in vision.notes)
+            multi_detector_agreement = (vision.is_anomalous and (has_continuity_note or has_puncture_note)) or (has_continuity_note and has_puncture_note)
+
+            # 1. Primary PaDiM Evaluation
+            if is_borderline:
+                # Rule: Borderline proximity (|margin| < 3.0) is ALWAYS Uncertain Human Review (never defect)
+                add_finding(
+                    finding_id=f"padim_borderline_{vision.image_id}",
+                    category="uncertain_human_review",
+                    title="Borderline Score Proximity (Near Decision Boundary)",
+                    description=(
+                        f"PaDiM anomaly score {score:.2f} is within {abs(margin):.2f} points of decision threshold "
+                        f"{threshold:.2f} ({'above' if margin >= 0 else 'below'}). Sample lies in the boundary uncertainty band."
+                    ),
+                    provenance=FindingProvenance(
+                        detector="PaDiM", score=score, threshold=threshold, margin=round(margin, 3)
+                    ),
+                    action_required=(
+                        "Action Required: Secondary physical verification by an inspector is advised "
+                        "before approving or scrapping this component."
+                    ),
+                )
+            elif vision.is_anomalous:
+                if margin >= 5.0 or multi_detector_agreement:
+                    # Rule: High-margin (margin >= 5.0) or multi-detector consensus -> Candidate Defect
+                    add_finding(
+                        finding_id=f"padim_candidate_{vision.image_id}",
+                        category="candidate_defects",
+                        title="Candidate Defect (Strong Visual Indication)",
+                        description=(
+                            f"PaDiM anomaly score {score:.2f} significantly exceeds calibrated threshold {threshold:.2f} "
+                            f"(+{margin:.2f} margin) with {len(vision.regions)} candidate defect region(s)."
+                        ),
+                        provenance=FindingProvenance(
+                            detector="PaDiM", score=score, threshold=threshold, margin=round(margin, 3)
+                        ),
+                        action_required="Action Required: Visually inspect candidate defect region(s) against acceptance limits.",
                     )
                 else:
-                    categorized_findings["potential_anomalies"].append(
-                        f"Potential anomaly detected: raw score {vision.raw_anomaly_score:.2f} ≥ "
-                        f"threshold {vision.threshold:.2f} with {len(vision.regions)} candidate defect region(s)."
-                    )
-            else:
-                if is_borderline:
-                    categorized_findings["uncertain_human_review"].append(
-                        f"Borderline normal sample ({vision.raw_anomaly_score:.2f} vs threshold {vision.threshold:.2f}); "
-                        f"close proximity to boundary warrants secondary visual verification."
+                    # Rule: Moderate non-borderline margin (3.0 <= margin < 5.0) -> Potential Anomaly
+                    add_finding(
+                        finding_id=f"padim_potential_{vision.image_id}",
+                        category="potential_anomalies",
+                        title="Potential Surface Anomaly (Moderate Score Margin)",
+                        description=(
+                            f"PaDiM anomaly score {score:.2f} exceeds calibrated threshold {threshold:.2f} "
+                            f"(+{margin:.2f} margin) with {len(vision.regions)} candidate defect region(s)."
+                        ),
+                        provenance=FindingProvenance(
+                            detector="PaDiM", score=score, threshold=threshold, margin=round(margin, 3)
+                        ),
+                        action_required="Action Required: Check candidate defect region(s) on next inspection cycle.",
                     )
 
-            # Categorize specialized detector findings from notes
+            # 2. Specialized Multi-Detector Evidence & Disagreement Resolution
             for note in vision.notes:
-                if "Specialized detector" in note:
-                    categorized_findings["confirmed_visual_defects"].append(note)
+                if "conductor_continuity_detector" in note:
+                    # Conductor continuity failure
+                    category = "candidate_defects" if (margin >= 5.0 or not vision.is_anomalous) else "potential_anomalies"
+                    # If PaDiM was nominal, explain negative anomaly
+                    disagree_prefix = "Detector Disagreement (Negative Anomaly Discovered): " if not vision.is_anomalous else ""
+                    add_finding(
+                        finding_id=f"cont_detector_{vision.image_id}",
+                        category=category,
+                        title=f"{disagree_prefix}Candidate Defect: Wire Harness Conductor Discontinuity",
+                        description=note,
+                        provenance=FindingProvenance(
+                            detector="ConductorContinuityDetector",
+                            threshold=0.50,
+                            location="wire harness divergence",
+                        ),
+                        action_required="Action Required: Count wire branches in divergence channels to confirm missing conductor.",
+                    )
+                elif "surface_puncture_detector" in note:
+                    if not vision.is_anomalous:
+                        # Detector disagreement: Puncture detector flagged single spike while PaDiM was nominal
+                        add_finding(
+                            finding_id=f"punc_detector_disagree_{vision.image_id}",
+                            category="uncertain_human_review",
+                            title="Detector Disagreement: Localized Puncture Indication vs Nominal PaDiM",
+                            description=(
+                                f"Surface Puncture Detector flagged localized patch activation, while PaDiM baseline "
+                                f"reports nominal overall cable geometry ({score:.2f} < {threshold:.2f}). {note}"
+                            ),
+                            provenance=FindingProvenance(
+                                detector="SurfacePunctureDetector",
+                                threshold=38.0,
+                                location="cable jacket",
+                            ),
+                            action_required="Action Required: Examine highlighted jacket coordinates to rule out natural surface glare or flexure.",
+                        )
+                    else:
+                        add_finding(
+                            finding_id=f"punc_detector_corroborated_{vision.image_id}",
+                            category="candidate_defects",
+                            title="Candidate Defect: Localized Insulation Puncture",
+                            description=note,
+                            provenance=FindingProvenance(
+                                detector="SurfacePunctureDetector",
+                                threshold=38.0,
+                                location="cable jacket",
+                            ),
+                            action_required="Action Required: Physically probe cable jacket at candidate puncture coordinates.",
+                        )
 
-        # Categorize other evidence items
+        # 3. Categorize remaining evidence items without duplicating
         for f in findings:
             st = f.statement
             st_low = st.lower()
-            if "confirmed" in st_low:
-                if st not in categorized_findings["confirmed_visual_defects"]:
-                    categorized_findings["confirmed_visual_defects"].append(st)
-            elif "uncertain" in st_low or "borderline" in st_low or "review" in st_low:
-                if st not in categorized_findings["uncertain_human_review"]:
-                    categorized_findings["uncertain_human_review"].append(st)
-            elif f.kind == EvidenceKind.HYPOTHESIS or "potential" in st_low or "anomaly" in st_low:
-                if st not in categorized_findings["potential_anomalies"]:
-                    categorized_findings["potential_anomalies"].append(st)
+            fid = f"evidence_{abs(hash(st))}"
+            if "borderline" in st_low or "uncertain" in st_low:
+                add_finding(
+                    finding_id=fid,
+                    category="uncertain_human_review",
+                    title="Uncertain Finding (Requires Review)",
+                    description=st,
+                    provenance=FindingProvenance(detector=f.source or "InspectionAgent"),
+                    action_required="Action Required: Secondary manual review recommended.",
+                )
+            elif "confirmed" in st_low:
+                add_finding(
+                    finding_id=fid,
+                    category="candidate_defects",
+                    title="Candidate Defect (Strong Indication)",
+                    description=st,
+                    provenance=FindingProvenance(detector=f.source or "InspectionAgent"),
+                    action_required="Action Required: Physical inspection verification required.",
+                )
+            elif "anomaly" in st_low or "potential" in st_low or f.kind == EvidenceKind.HYPOTHESIS:
+                add_finding(
+                    finding_id=fid,
+                    category="potential_anomalies",
+                    title="Potential Anomaly",
+                    description=st,
+                    provenance=FindingProvenance(detector=f.source or "InspectionAgent"),
+                    action_required="Action Required: Operational monitoring recommended.",
+                )
 
         return InspectionReport(
             image_id=image_id, question=question, summary=summary,
             findings=findings, recommendations=recs, limitations=limits,
             vision=vision, retrieval=retrieval, generator="deterministic",
-            trace=trace, categorized_findings=categorized_findings)
+            trace=trace, structured_findings=structured_findings,
+            categorized_findings=categorized_findings)
 
     # ---------------- optional LLM ----------------
     def _llm_report(self, image_id, question, vision, retrieval,

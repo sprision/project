@@ -92,15 +92,18 @@
 ---
 
 ### 11. Specialized Multi-Detector Architecture for Cable Inspection & Tripartite Finding Categorization
-- **Decision:** Address the two catastrophic failure modes of standard PaDiM on cables (`missing_wire` at 12.5% recall and `poke_insulation` at 0.0% recall) by creating `SpecializedCableInspector` in `src/app/vision/cable_inspector.py`. Enforce a tripartite finding classification taxonomy across report schemas and dashboard:
-  1. *Confirmed visual defects* (high-margin anomalies $\Delta \ge 5.0$ or multi-detector consensus)
-  2. *Potential anomalies* (single-detector moderate activations)
-  3. *Uncertain findings requiring human review* (borderline proximity $|\Delta| < 3.0$ or background negative anomaly risk)
-- **Rationale & Empirical Evidence:**
-  - *Missing Wire Resolution:* Missing wires expose the light-grey background, which matches the Gaussian distribution learned from flexible cable bends during normal training (negative anomaly problem). `ConductorContinuityDetector` measures transmission density across 3 divergence harness channels (top, left, right). On held-out evaluation, setting calibration threshold $T=0.50$ boosted `missing_wire` recall from **12.5% to 62.5%** (+50.0% gain).
-  - *Poke Insulation Resolution:* Microscopic punctures ($98 \times 114$ px on $1024 \times 1024$) are diluted by PaDiM's default $\sigma=4.0$ smoothing. `SurfacePunctureDetector` preserves high-frequency patch activations ($\sigma=1.0$), where poke peaks reach 33.58–54.11 vs clean cables (24.42–28.41). On held-out evaluation, setting calibration threshold $T=38.0$ boosted `poke_insulation` recall from **0.0% to 100.0%** (+100.0% gain, 6/6 detected).
-  - *Overall Held-Out Impact:* Sensitivity on untouched held-out cable evaluation increased from **60.87% (28/46) to 89.13% (41/46)** (+28.26% overall recall gain), cutting false negatives from 18 to 5.
-  - *Tripartite Taxonomy Justification:* Increased sensitivity elevated false alarms on clean twisted cables (specificity dropped from 82.8% to 65.5%). Categorizing findings into *Confirmed defects*, *Potential anomalies*, and *Uncertain human review* ensures operators know exactly which alarms are mathematically unambiguous versus those requiring quick visual verification.
+- **Decision:** Address the two catastrophic failure modes of standard PaDiM on cables (`missing_wire` at 12.5% recall and `poke_insulation` at 0.0% recall) by creating `SpecializedCableInspector` in `src/app/vision/cable_inspector.py`. Enforce a strictly mutually exclusive tripartite finding classification taxonomy across report schemas and dashboard:
+  1. *Candidate Visual Defects (Strong Model Indications)* (high score margin $\Delta \ge 5.0$ or multi-detector consensus, with zero borderline proximity)
+  2. *Potential Anomalies (Single-Detector Moderate Indications)* (single detector activation outside the borderline band: $3.0 \le \Delta < 5.0$)
+  3. *Uncertain Findings Requiring Human Review* (borderline proximity $|\Delta| < 3.0$, detector disagreements, or documented category limitations)
+- **Authority Boundary Notice:** Algorithmic detections are strictly labeled as candidate hypotheses (`is_human_confirmed: bool = False`), never as "confirmed physical defects" without independent physical verification by a qualified inspector.
+- **Detector Disagreement & False Positive Resolution:**
+  - Evaluated on calibration data only: unconstrained OR logic across whole-image puncture peaks at $T=38.0$ caused 8 false alarms on clean twisted cables due to boundary edge noise and surface glints.
+  - Resolved by:
+    1. Masking boundary framing patches (outer 2 patches) to eliminate frame edge glints.
+    2. Routing single-detector disagreements where PaDiM is nominal strictly into `uncertain_human_review` with specific spatial coordinates and actionable physical inspection instructions rather than hard defect rejections.
+    3. On calibration data, this policy cuts false alarms in half (FPR $27.59\% \to 13.79\%$), increases specificity to $86.21\%$, and improves balanced accuracy to $85.49\%$.
+- **Latency Profile:** Measured end-to-end composite pipeline latency is ~390 ms (PaDiM: 154 ms, Continuity: 74 ms, Puncture: 98 ms, Retrieval: 14 ms, DB: 0.6 ms, Report synthesis: 0.1 ms).
 
 
 

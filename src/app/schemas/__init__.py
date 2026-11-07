@@ -86,6 +86,25 @@ class EvidenceItem(BaseModel):
     confidence: float | None = None           # 0..1 if applicable
 
 
+class FindingProvenance(BaseModel):
+    detector: str                             # "PaDiM" | "ConductorContinuityDetector" | "SurfacePunctureDetector" | "KnowledgeBase" | ...
+    score: float | None = None                # raw metric / defect score
+    threshold: float | None = None            # decision cutoff
+    margin: float | None = None               # score - threshold
+    location: str | None = None               # spatial coordinates or harness channel
+    bbox: tuple[int, int, int, int] | None = None  # (x, y, w, h)
+
+
+class CategorizedFinding(BaseModel):
+    id: str                                   # unique deterministic key to prevent duplicate findings
+    category: str                             # "candidate_defects" | "potential_anomalies" | "uncertain_human_review"
+    title: str
+    description: str
+    provenance: FindingProvenance
+    is_human_confirmed: bool = False          # Algorithmic indications are hypotheses until human physical verification
+    action_required: str | None = None        # Actionable recommendation for human inspector
+
+
 class InspectionReport(BaseModel):
     image_id: str
     question: str
@@ -97,9 +116,11 @@ class InspectionReport(BaseModel):
     retrieval: RetrievalResult | None
     generator: str                            # "deterministic" | "openai" | ...
     trace: list[dict[str, Any]] = Field(default_factory=list)  # agent tool calls
+    structured_findings: list[CategorizedFinding] = Field(default_factory=list)
     categorized_findings: dict[str, list[str]] = Field(
         default_factory=lambda: {
-            "confirmed_visual_defects": [],
+            "candidate_defects": [],
+            "confirmed_visual_defects": [],  # Backwards-compatible alias for candidate_defects
             "potential_anomalies": [],
             "uncertain_human_review": [],
         }
