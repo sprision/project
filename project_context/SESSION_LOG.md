@@ -94,3 +94,39 @@
   - Full unit test suite: **43 / 43 passed** in 33.41s across all 8 suites (`test_schemas.py`, `test_db.py`, `test_ingest.py`, `test_report.py`, `test_vision_validation.py`, `test_threshold_calibration.py`, `test_retriever.py`, `test_agent.py`).
   - End-to-end inspection pipeline verified on defective MVTec AD bottle (`data/raw/mvtec_ad/bottle/test/broken_large/000.png`): All tool calls succeeded (`inspect_image`, `retrieve_technical_documents`, `summarize_evidence`, `generate_inspection_report`), SQLite database recorded the report, and report JSON export is verified.
 - **Preservation Check:** All existing models (`data/index/vision/`) and evaluation benchmarks (`runs/`) remain intact.
+
+---
+
+### Session 4: Comprehensive Anomaly Detection Reliability Validation
+- **Date & Local Time:** 2026-11-07T13:40:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:** Validate PaDiM anomaly detection reliability across all known-good and known-defective samples in MVTec AD (`bottle`, `cable`, `metal_nut`) using existing calibrated thresholds.
+- **Commands Executed:**
+  - `.\.venv\Scripts\python.exe -m scripts.validate_anomaly_detection`
+  - `.\.venv\Scripts\pytest.exe tests\unit\test_threshold_calibration.py -v`
+  - `.\.venv\Scripts\pytest.exe tests\unit\ -v`
+- **Measured Results Across All 348 MVTec AD Test Images:**
+  1. **Bottle (83 images: 20 good, 63 defective; Threshold 23.4613):**
+     - Confusion Matrix: TP=63, FP=0, TN=20, FN=0
+     - Sensitivity: 1.0000 | Specificity: 1.0000 | Balanced Accuracy: 1.0000 | FPR: 0.0000
+     - Image AUROC: 1.0000 (Matches `runs/eval_cv.json`)
+     - False positives: 0. False negatives: 0.
+  2. **Cable (150 images: 58 good, 92 defective; Threshold 30.4218):**
+     - Confusion Matrix: TP=60, FP=6, TN=52, FN=32
+     - Sensitivity: 0.6522 | Specificity: 0.8966 | Balanced Accuracy: 0.7744 | FPR: 0.1034
+     - Image AUROC: 0.8413 (Matches `runs/eval_cv.json`)
+     - False Positives (6 clean samples): `cable/test/good/007.png` (34.37), `008.png` (34.46), `016.png` (34.09), `019.png` (35.72), `036.png` (31.42), `041.png` (35.80) due to natural cable twists/sheath folds.
+     - False Negatives (32 defective samples): primarily `poke_insulation` (10/10 missed, scores 21.2–27.9) and `missing_wire` (9/10 missed, scores 15.8–29.0) where subtle pinprick or missing conductor features do not create high patch activation.
+  3. **Metal Nut (115 images: 22 good, 93 defective; Threshold 23.1698):**
+     - Confusion Matrix: TP=84, FP=1, TN=21, FN=9
+     - Sensitivity: 0.9032 | Specificity: 0.9545 | Balanced Accuracy: 0.9289 | FPR: 0.0455
+     - Image AUROC: 0.9741 (Matches `runs/eval_cv.json`)
+     - False Positives (1 clean sample): `metal_nut/test/good/006.png` (30.0865) due to an edge feature at image crop boundary (`y=0`).
+     - False Negatives (9 defective samples): subtle scratches (4) and minor bends (5) scoring between 17.8 and 23.1.
+- **Unit Test Additions:**
+  - Added `test_calibrated_threshold_files_exist_and_positive` and `test_metrics_calculation_known_values` in `tests/unit/test_threshold_calibration.py`.
+  - All 45 unit tests pass in 33.5s.
+- **Artifacts Created:**
+  - `scripts/validate_anomaly_detection.py` (Validation script).
+  - `runs/validation_results.json` (Full 348-image record without touching `runs/eval_cv.json` or `runs/calibration.json`).
+- **Preservation Check:** All existing PaDiM pickle weights in `data/index/vision/` and benchmark runs in `runs/` preserved unmodified.

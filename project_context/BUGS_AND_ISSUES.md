@@ -5,8 +5,19 @@
 ### 1. `cable` Category Score Overlap (Model Limitation)
 - **Component:** `src/app/vision/model.py` / `data/index/vision/cable/padim.pkl`
 - **Description:** PaDiM anomaly scores for defective and defect-free cable samples exhibit noticeable overlap, yielding an image AUROC of 0.8413 (compared to 1.0000 for bottle and 0.9741 for metal_nut).
-- **Impact:** Any single threshold produces either false alarms on bent/twisted normal cables or misses subtle insulation cracks. In `runs/calibration.json`, the 50-seed Monte Carlo sweep shows an evaluation false positive rate of ~17.2% to 21.2%.
+- **Validation Findings (Full 150 Test Images):**
+  - **Clean Samples (58):** 52 correctly classified (TN), 6 false alarms (FP) on twisted/bent cables (`007.png`, `008.png`, `016.png`, `019.png`, `036.png`, `041.png`) scoring 31.42 to 35.80 vs threshold 30.4218. Specificity is 89.66%, FPR is 10.34%.
+  - **Defective Samples (92):** 60 detected (TP), 32 missed (FN). Coarse defects (`cut_outer_insulation`, `bent_wire`, `combined`, `missing_cable`) achieve 85–100% recall. Low-patch-activation defects (`missing_wire` missing 9/10, `poke_insulation` missing 10/10) score between 15.8 and 27.9 due to Gaussian smoothing over small spatial disruptions and missing conductor features matching normal background.
+- **Impact:** Any single threshold produces either false alarms on bent/twisted normal cables or misses subtle insulation cracks/missing wires.
 - **Mitigation:** The system explicitly classifies findings as hypotheses rather than definitive diagnoses and surfaces candidate defect regions for manual human visual inspection.
+
+---
+
+### 2. Crop-Boundary False Positive on Normal Metal Nut (Sample `006.png`)
+- **Component:** `src/app/vision/model.py` / `metal_nut`
+- **Description:** During full 115-sample test validation, 21 of 22 normal metal_nut images correctly scored below calibrated threshold 23.1698 (specificity 95.45%). One sample (`metal_nut/test/good/006.png`) scored 30.0865.
+- **Root Cause:** Connected component analysis localized a single defect region at `y=0` (`bbox=(42, 0, 21, 18)`), corresponding to a bright specular edge reflection touching the top crop boundary.
+- **Status:** Documented model edge characteristic. Consistent with calibration stability log (`runs/calibration.json` 50-seed eval FPR mean = 10.36%).
 
 ---
 

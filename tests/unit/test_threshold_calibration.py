@@ -78,3 +78,34 @@ def test_fallback_normalised_verdict(tmp_path):
     assert res.verdict_mode == "normalised"
     assert res.is_anomalous is False
     assert res.threshold == pytest.approx(0.5)
+
+
+def test_calibrated_threshold_files_exist_and_positive():
+    """Verify that all production categories have calibrated raw thresholds."""
+    vdir = Path("data/index/vision")
+    for cat in ["bottle", "cable", "metal_nut"]:
+        tpath = vdir / cat / "threshold.json"
+        assert tpath.exists(), f"threshold.json missing for {cat}"
+        data = json.loads(tpath.read_text(encoding="utf-8"))
+        assert "threshold_raw" in data
+        assert isinstance(data["threshold_raw"], (int, float))
+        assert data["threshold_raw"] > 0, f"threshold must be positive for {cat}"
+        assert data["category"] == cat
+
+
+def test_metrics_calculation_known_values():
+    """Validate sensitivity, specificity, balanced accuracy, and FPR arithmetic."""
+    from scripts.calibrate_thresholds import metrics
+    # y: 1=defect, 0=good. 3 TP, 1 FN, 4 TN, 2 FP
+    y = np.array([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    pred = np.array([1, 1, 1, 0, 0, 0, 0, 0, 1, 1])
+    m = metrics(y, pred)
+    assert m["tp"] == 3
+    assert m["fn"] == 1
+    assert m["tn"] == 4
+    assert m["fp"] == 2
+    assert m["sensitivity"] == pytest.approx(3 / 4)
+    assert m["specificity"] == pytest.approx(4 / 6)
+    assert m["false_positive_rate"] == pytest.approx(2 / 6)
+    assert m["balanced_accuracy"] == pytest.approx(0.5 * (3 / 4 + 4 / 6))
+

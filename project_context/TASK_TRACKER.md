@@ -17,16 +17,26 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (43 / 43 Passed)**
+- [x] **Unit Test Suite Verification (45 / 45 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
   - `tests/unit/test_report.py`: 7 passed (0.70s) [Added 2 regression tests for dict-serialized retrieval]
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
-  - `tests/unit/test_threshold_calibration.py`: 6 passed (14.81s)
+  - `tests/unit/test_threshold_calibration.py`: 8 passed (15.55s) [Added 2 tests for calibration threshold loading and metric arithmetic]
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
   - `tests/unit/test_agent.py`: 10 passed (32.76s) [Added 1 regression test for tool report assembly]
-  - Total: **43 passing tests** across 8 unit test suites.
+  - Total: **45 passing tests** across 8 unit test suites.
+
+- [x] **Anomaly Detection Reliability Validation (Complete 348 MVTec AD Samples)**
+  - Evaluated all known-good and known-defective images for `bottle` (83), `cable` (150), and `metal_nut` (115) with calibrated thresholds.
+  - Calculated confusion matrices, sensitivity, specificity, FPR, FNR, balanced accuracy, and AUROC for each category.
+  - Confirmed AUROCs match benchmark values: Bottle 1.0000, Cable 0.8413, Metal Nut 0.9741.
+  - Investigated clean false-positive samples:
+    - Bottle: 0 false positives (100% specificity).
+    - Metal Nut: 1 false positive (`006.png`, score 30.0865, edge artifact at `y=0`; 95.45% specificity).
+    - Cable: 6 false positives (scores 31.42–35.80, twisted normal cables; 89.66% specificity).
+  - Saved full validation records to `runs/validation_results.json` without modifying existing benchmark files.
 
 - [x] **Report Generation Data-Contract Bug Fix**
   - Identified data-contract mismatch where `agent.py` serialized `RetrievalResult` into a dictionary when invoking `generate_inspection_report`, causing `_t_report` to pass a dict to `ReportGenerator._deterministic` which accessed `retrieval.chunks` directly (`AttributeError: 'dict' object has no attribute 'chunks'`).
