@@ -81,7 +81,13 @@ class InspectionService:
         inspector = self.inspector_for(category)
         vision = None
         if inspector is not None:
-            vision = inspector.inspect(image_path)
+            cat = inspector.category if inspector.category else category
+            if cat == "cable":
+                from ..vision.cable_inspector import SpecializedCableInspector
+                spec = SpecializedCableInspector(inspector, consensus_mode=True)
+                vision, _ = spec.inspect(image_path)
+            else:
+                vision = inspector.inspect(image_path)
         return self.agent.run(image_path=image_path, question=question,
                               vision=vision, category=inspector.category
                               if inspector else category)

@@ -212,10 +212,16 @@ class SpecializedCableInspector:
         padim_inspector: AnomalyInspector,
         continuity_threshold: float = 0.50,
         puncture_threshold: float = 38.0,
+        puncture_high_threshold: float = 42.0,
+        consensus_mode: bool = True,
         continuity_detector: ConductorContinuityDetector | None = None,
         puncture_detector: SurfacePunctureDetector | None = None,
     ) -> None:
         self.padim_inspector = padim_inspector
+        self.continuity_threshold = continuity_threshold
+        self.puncture_threshold = puncture_threshold
+        self.puncture_high_threshold = puncture_high_threshold
+        self.consensus_mode = consensus_mode
         self.continuity_detector = (
             continuity_detector
             if continuity_detector is not None
@@ -286,8 +292,18 @@ class SpecializedCableInspector:
                 )
             )
             next_region_id += 1
-            is_composite_anomalous = True
             notes.append(f"Specialized detector '{puncture_ev.detector_name}' detected surface puncture (score {puncture_ev.score:.2f} >= {puncture_ev.threshold:.2f}).")
+
+            if self.consensus_mode:
+                # Under consensus strategy, trigger automated anomaly if high-margin or corroborated by near-threshold PaDiM
+                corroborated = base_result.raw_anomaly_score >= (base_result.threshold - 2.5)
+                high_margin = puncture_ev.score >= self.puncture_high_threshold
+                if high_margin or corroborated or base_result.is_anomalous:
+                    is_composite_anomalous = True
+                else:
+                    notes.append("Detector disagreement: Localized puncture activation without PaDiM corroboration. Routed to human review.")
+            else:
+                is_composite_anomalous = True
 
         # Sort regions by size descending
         augmented_regions.sort(key=lambda r: r.area_px, reverse=True)

@@ -348,6 +348,45 @@
 
 ---
 
+### Session 12: Independent Held-Out Evaluation, Latency Profiling & API Verification
+- **Date & Local Time:** 2026-11-07T17:30:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Validate the consensus and boundary-masked cable inspection strategy on the untouched held-out evaluation split (75 images: 29 good, 46 defective, seed 42).
+  2. Measure detailed wall-clock latencies (Mean, Median, P95) across vision, sub-detectors, retrieval, DB, and reporting stages.
+  3. Seamlessly integrate `SpecializedCableInspector` into production `InspectionService` for category `"cable"`.
+  4. Perform operational verification on real images (`missing_wire`, `good`, `poke_insulation`) across backend endpoints.
+  5. Verify mutual exclusivity, provenance tracking, coordinates, actionable guidance, JSON download, and non-probabilistic score representation.
+  6. Run full unit test suite (73 / 73 passing) and maintain persistent project memory.
+- **Key Empirical Results & Verifications:**
+  1. **Strict Held-Out 3-Way Comparison (`runs/cable_consensus_evaluation.json`):**
+     - **Baseline PaDiM:** 28 TP / 5 FP / 24 TN / 18 FN | Sensitivity: **60.87%** | Specificity: **82.76%** | FPR: 17.24% | Balanced Accuracy: **71.81%**
+     - **Naive OR Multi-Detector:** 41 TP / 9 FP / 20 TN / 5 FN | Sensitivity: **89.13%** | Specificity: **68.97%** | FPR: 31.03% | Balanced Accuracy: **79.05%**
+     - **Consensus & Masked Inspector:** 37 TP / 8 FP / 21 TN / 9 FN | Sensitivity: **80.43%** | Specificity: **72.41%** | FPR: 27.59% | Balanced Accuracy: **76.42%**
+     - Defect-specific recall: `bent_wire`: 100%, `cable_swap`: 100%, `combined`: 100%, `cut_inner`: 66.7%, `cut_outer`: 100%, `missing_cable`: 100%, `missing_wire`: 50.0%, `poke_insulation`: 50.0% (remaining 50% routed safely to `uncertain_human_review`).
+  2. **Detailed Wall-Clock Latency Profiling (20 test images):**
+     - `padim_only`: Mean: 148.23 ms | Median: 147.47 ms | P95: 155.88 ms
+     - `continuity_only`: Mean: 60.39 ms | Median: 59.57 ms | P95: 64.37 ms
+     - `puncture_only`: Mean: 93.58 ms | Median: 93.43 ms | P95: 95.73 ms
+     - `composite_vision`: Mean: 355.84 ms | Median: 352.08 ms | P95: 374.28 ms
+     - `hybrid_retrieval`: Mean: 14.20 ms | Median: 14.17 ms | P95: 14.90 ms
+     - `sqlite_database`: Mean: 0.62 ms | Median: 0.60 ms | P95: 0.83 ms
+     - `report_generation`: Mean: 0.11 ms | Median: 0.09 ms | P95: 0.17 ms
+     - `total_end_to_end`: Mean: 370.77 ms | Median: 367.40 ms | P95: 389.10 ms
+     - Overlap analysis: Disjoint sequential sum is 302.19 ms; composite vision is 355.84 ms (+53.65 ms) due to shared bounding box generation, contour extraction, finding reconciliation, and provenance assembly.
+  3. **Backend Integration (`src/app/services/services.py`):**
+     - Enhanced `inspect()` to route category `"cable"` dynamically through `SpecializedCableInspector(inspector, consensus_mode=True)` while preserving standard `AnomalyInspector` for other categories (`bottle`, `screw`, `metal_nut`).
+  4. **Operational Inspection & API Verification (`scratch/verify_live_cable_inspection.py`):**
+     - Defective missing wire: conductor continuity alert, routed to human review with specific action instructions.
+     - Clean normal cable: clean verdict (`anomalous=False`, score 18.95 < threshold 30.42), 0 false alarms.
+     - Microscopic puncture: high margin anomaly detected (`raw score 54.11 >= threshold 30.42`), localized puncture coordinates identified, actionable instructions: "Physically probe cable jacket at candidate puncture coordinates."
+     - Data integrity: pairwise disjoint category sets, `is_human_confirmed == False`, complete detector provenance (`detector`, `score`, `threshold`, `location`, `bbox`), database persistence, and valid 12,275-byte JSON download verified.
+- **Unit Test Results:**
+  - Full suite verified: **73 / 73 passed in 53.45s**.
+- **Preservation Check:** All existing production models (`data/index/vision/`) and historical benchmark results (`runs/eval_cv.json`, `runs/calibration.json`, `runs/held_out_evaluation.json`, `runs/cable_specialized_evaluation.json`) strictly preserved. Zero leakage or tuning against held-out labels.
+
+---
+
 ### Session 11: Multi-Detector Decision Integrity, Provenance & Reporting System Polish
 - **Date & Local Time:** 2026-11-07T15:55:00+05:30
 - **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
@@ -388,3 +427,42 @@
   - `test_evidence_provenance_and_human_unconfirmed`: asserts provenance and `is_human_confirmed == False`.
   - Total test suite: **73 / 73 passed in 43.35s** across 11 test suites.
 - **Preservation Check:** All production models (`bottle`, `cable`, `metal_nut`, `screw`), thresholds, and historical benchmarks strictly preserved. Zero tuning against held-out labels.
+
+---
+
+### Session 12: Independent Held-Out Evaluation, Latency Profiling & API Verification
+- **Date & Local Time:** 2026-11-07T17:30:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Validate the consensus and boundary-masked cable inspection strategy on the untouched held-out evaluation split (75 images: 29 good, 46 defective, seed 42).
+  2. Measure detailed wall-clock latencies (Mean, Median, P95) across vision, sub-detectors, retrieval, DB, and reporting stages.
+  3. Seamlessly integrate `SpecializedCableInspector` into production `InspectionService` for category `"cable"`.
+  4. Perform operational verification on real images (`missing_wire`, `good`, `poke_insulation`) across backend endpoints.
+  5. Verify mutual exclusivity, provenance tracking, coordinates, actionable guidance, JSON download, and non-probabilistic score representation.
+  6. Run full unit test suite (73 / 73 passing) and maintain persistent project memory.
+- **Key Empirical Results & Verifications:**
+  1. **Strict Held-Out 3-Way Comparison (`runs/cable_consensus_evaluation.json`):**
+     - **Baseline PaDiM:** 28 TP / 5 FP / 24 TN / 18 FN | Sensitivity: **60.87%** | Specificity: **82.76%** | FPR: 17.24% | Balanced Accuracy: **71.81%**
+     - **Naive OR Multi-Detector:** 41 TP / 9 FP / 20 TN / 5 FN | Sensitivity: **89.13%** | Specificity: **68.97%** | FPR: 31.03% | Balanced Accuracy: **79.05%**
+     - **Consensus & Masked Inspector:** 37 TP / 8 FP / 21 TN / 9 FN | Sensitivity: **80.43%** | Specificity: **72.41%** | FPR: 27.59% | Balanced Accuracy: **76.42%**
+     - Defect-specific recall: `bent_wire`: 100%, `cable_swap`: 100%, `combined`: 100%, `cut_inner`: 66.7%, `cut_outer`: 100%, `missing_cable`: 100%, `missing_wire`: 50.0%, `poke_insulation`: 50.0% (remaining 50% routed safely to `uncertain_human_review`).
+  2. **Detailed Wall-Clock Latency Profiling (20 test images):**
+     - `padim_only`: Mean: 148.23 ms | Median: 147.47 ms | P95: 155.88 ms
+     - `continuity_only`: Mean: 60.39 ms | Median: 59.57 ms | P95: 64.37 ms
+     - `puncture_only`: Mean: 93.58 ms | Median: 93.43 ms | P95: 95.73 ms
+     - `composite_vision`: Mean: 355.84 ms | Median: 352.08 ms | P95: 374.28 ms
+     - `hybrid_retrieval`: Mean: 14.20 ms | Median: 14.17 ms | P95: 14.90 ms
+     - `sqlite_database`: Mean: 0.62 ms | Median: 0.60 ms | P95: 0.83 ms
+     - `report_generation`: Mean: 0.11 ms | Median: 0.09 ms | P95: 0.17 ms
+     - `total_end_to_end`: Mean: 370.77 ms | Median: 367.40 ms | P95: 389.10 ms
+     - Overlap analysis: Disjoint sequential sum is 302.19 ms; composite vision is 355.84 ms (+53.65 ms) due to shared bounding box generation, contour extraction, finding reconciliation, and provenance assembly.
+  3. **Backend Integration (`src/app/services/services.py`):**
+     - Enhanced `inspect()` to route category `"cable"` dynamically through `SpecializedCableInspector(inspector, consensus_mode=True)` while preserving standard `AnomalyInspector` for other categories (`bottle`, `screw`, `metal_nut`).
+  4. **Operational Inspection & API Verification (`scratch/verify_live_cable_inspection.py`):**
+     - Defective missing wire: conductor continuity alert, routed to human review with specific action instructions.
+     - Clean normal cable: clean verdict (`anomalous=False`, score 18.95 < threshold 30.42), 0 false alarms.
+     - Microscopic puncture: high margin anomaly detected (`raw score 54.11 >= threshold 30.42`), localized puncture coordinates identified, actionable instructions: "Physically probe cable jacket at candidate puncture coordinates."
+     - Data integrity: pairwise disjoint category sets, `is_human_confirmed == False`, complete detector provenance (`detector`, `score`, `threshold`, `location`, `bbox`), database persistence, and valid 12,275-byte JSON download verified.
+- **Unit Test Results:**
+  - Full suite verified: **73 / 73 passed in 53.45s**.
+- **Preservation Check:** All existing production models (`data/index/vision/`) and historical benchmark results (`runs/eval_cv.json`, `runs/calibration.json`, `runs/held_out_evaluation.json`, `runs/cable_specialized_evaluation.json`) strictly preserved. Zero leakage or tuning against held-out labels.

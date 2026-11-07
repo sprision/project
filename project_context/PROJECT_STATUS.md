@@ -11,12 +11,19 @@
   - `data/index/vision/screw/padim.pkl` (662 MB) — Exists, verified.
 - **Experimental Models & Benchmarking:**
   - `src/app/vision/patchcore.py`: Experimental PatchCore architecture featuring ResNet-18 layer2+3 patch representations and memory-bank nearest-neighbor scoring.
-  - `src/app/vision/cable_inspector.py`: Specialized multi-detector cable inspection architecture integrating `ConductorContinuityDetector` and `SurfacePunctureDetector`.
-  - Head-to-head cable evaluation recorded in `runs/cable_specialized_evaluation.json`:
-    - `poke_insulation` recall boosted from **0.0% to 100.0%** (+100.0% gain).
-    - `missing_wire` recall boosted from **12.5% to 62.5%** (+50.0% gain).
-    - Overall cable sensitivity increased from **60.87% to 89.13% (+28.26% gain)** on strict held-out split (41/46 detected vs baseline 28/46).
-    - Balanced accuracy increased from 71.81% to 77.32%.
+  - `src/app/vision/cable_inspector.py`: Specialized multi-detector cable inspection architecture integrating `ConductorContinuityDetector` and `SurfacePunctureDetector` with consensus strategy and boundary noise masking.
+  - Head-to-head cable evaluation recorded in `runs/cable_specialized_evaluation.json` and `runs/cable_consensus_evaluation.json`:
+    - Strict held-out evaluation across 75 untouched test samples (seed 42, zero leakage):
+      - **Baseline PaDiM:** 28 TP / 5 FP / 24 TN / 18 FN | Sensitivity: **60.87%** | Specificity: **82.76%** | FPR: 17.24% | Balanced Accuracy: **71.81%** | Latency: 148.23 ms.
+      - **Naive OR Multi-Detector:** 41 TP / 9 FP / 20 TN / 5 FN | Sensitivity: **89.13%** | Specificity: **68.97%** | FPR: 31.03% | Balanced Accuracy: **79.05%**.
+      - **Consensus & Masked Inspector:** 37 TP / 8 FP / 21 TN / 9 FN | Sensitivity: **80.43%** | Specificity: **72.41%** | FPR: 27.59% | Balanced Accuracy: **76.42%** | Latency: 355.84 ms.
+      - Key Defect Recall: `bent_wire`: 100.0%, `cable_swap`: 100.0%, `combined`: 100.0%, `cut_inner`: 66.7%, `cut_outer`: 100.0%, `missing_cable`: 100.0%, `missing_wire`: 50.0%, `poke_insulation`: 50.0% (remaining 50% routed strictly to `uncertain_human_review`).
+    - Detailed latency percentiles across 20 test images:
+      - Composite Vision: Mean **355.84 ms**, Median **352.08 ms**, P95 **374.28 ms**.
+      - Hybrid Retrieval: Mean **14.20 ms**, Median **14.17 ms**, P95 **14.90 ms**.
+      - SQLite History: Mean **0.62 ms**, Median **0.60 ms**, P95 **0.83 ms**.
+      - Report Generation: Mean **0.11 ms**, Median **0.09 ms**, P95 **0.17 ms**.
+      - Total End-to-End Pipeline: Mean **370.77 ms**, Median **367.40 ms**, P95 **389.10 ms**.
   - Empirical comparison documented in `runs/experimental_benchmarks.json`:
     - On held-out screw evaluation, PatchCore increases specificity from 28.57% (PaDiM) to **47.62%** and reduces FPR from 71.43% to **52.38%** (Pixel AUROC = 0.9709).
     - Rotation-normalized PaDiM evaluated: in-plane 2D alignment collapsed held-out AUROC to 0.4374 and sensitivity to 1.69% due to border padding, 180° flip ambiguity, and unresolved 3D helical roll angle.

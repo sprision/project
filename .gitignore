@@ -11,6 +11,9 @@ venv/
 # Project data / artifacts (large or generated)
 data/raw/
 data/index/
+data/uploads/
+data/heatmaps/
+data/*.db
 data/kb/*.pdf
 runs/
 artifacts/

@@ -39,17 +39,34 @@
   - Total unit test suite: **69 / 69 passing in 79.09s**.
   - Recorded benchmark results in `runs/cable_specialized_evaluation.json`.
 
-- [x] **Multi-Detector Decision & Reporting System Validation**
+- [x] **Multi-Detector Decision & Reporting System Validation & Operational Verification**
   - Inspected decision rules and resolved overlapping conditions between Potential Anomalies and Human Review:
     - Made all three categories strictly mutually exclusive: borderline zone ($|\Delta| < 3.0$) routes exclusively to `uncertain_human_review`, high-margin ($\Delta \ge 5.0$) or corroborated consensus routes to `candidate_defects`, and moderate single-detector activations ($3.0 \le \Delta < 5.0$) route to `potential_anomalies`.
     - Prohibited labeling algorithmic predictions as confirmed physical defects: added `is_human_confirmed: bool = False` and titled findings as Candidate Defect / Potential Anomaly / Uncertain Finding.
   - Implemented multi-detector provenance tracking with `FindingProvenance` (`detector`, `score`, `threshold`, `margin`, `location`, `bbox`) and `CategorizedFinding`.
   - Implemented duplicate finding prevention using unique deterministic IDs.
   - Resolved detector disagreements (e.g. PaDiM nominal vs localized puncture trigger) by routing uncorroborated single-detector boundary spikes to `uncertain_human_review` with actionable review instructions.
-  - Investigated False Positive Rate increase on calibration data only: proved that unconstrained OR logic at $T=38.0$ across the full frame triggered on boundary edge noise and cable bend glints on twisted clean cables. Masking border patches and applying consensus cut calibration false positives in half (FPR $27.59\% \to 13.79\%$), boosting calibration balanced accuracy to $85.49\%$. Zero tuning against held-out labels.
-  - Measured end-to-end composite pipeline latency: ~390 ms (PaDiM: 154 ms, Continuity: 74 ms, Puncture: 98 ms, Retrieval: 14 ms, DB: 0.6 ms, Report synthesis: 0.1 ms).
+  - Independent Held-Out Evaluation on untouched evaluation split (75 images, seed 42, `runs/cable_consensus_evaluation.json`):
+    - Baseline PaDiM: 28 TP / 5 FP / 24 TN / 18 FN | Sens: 60.87% | Spec: 82.76% | FPR: 17.24% | BalAcc: 71.81%
+    - Naive OR Multi-Detector: 41 TP / 9 FP / 20 TN / 5 FN | Sens: 89.13% | Spec: 68.97% | FPR: 31.03% | BalAcc: 79.05%
+    - Consensus & Masked Inspector: 37 TP / 8 FP / 21 TN / 9 FN | Sens: 80.43% | Spec: 72.41% | FPR: 27.59% | BalAcc: 76.42%
+  - Measured detailed wall-clock latency across 20 test images:
+    - PaDiM alone: Mean 148.23 ms | Median 147.47 ms | P95 155.88 ms
+    - Conductor Continuity: Mean 60.39 ms | Median 59.57 ms | P95 64.37 ms
+    - Surface Puncture: Mean 93.58 ms | Median 93.43 ms | P95 95.73 ms
+    - Composite Vision: Mean 355.84 ms | Median 352.08 ms | P95 374.28 ms
+    - Hybrid Retrieval: Mean 14.20 ms | Median 14.17 ms | P95 14.90 ms
+    - SQLite DB History: Mean 0.62 ms | Median 0.60 ms | P95 0.83 ms
+    - Report Synthesis: Mean 0.11 ms | Median 0.09 ms | P95 0.17 ms
+    - Total End-to-End: Mean 370.77 ms | Median 367.40 ms | P95 389.10 ms
+  - Verified operational inspection via FastAPI backend and service layer on real images:
+    - Missing wire (defective conductor continuity alert)
+    - Clean cable (normal verdict, no false alarms)
+    - Puncture insulation (puncture detector activation, provenance, coordinates)
+    - Verified `/api/reports` and `/api/reports/{id}` detail retrieval
+    - Verified full JSON download serialization (12,275 bytes) with disclaimer and non-probabilistic distances.
   - Enhanced dashboard (`frontend/index.html`) with mutually exclusive categories, provenance pills, and actionable human review alerts.
-  - Added unit tests: `test_category_mutual_exclusivity_and_non_overlap`, `test_detector_disagreement_handling`, `test_duplicate_findings_prevention`, and `test_evidence_provenance_and_human_unconfirmed`. Total unit tests: **73 / 73 passed in 43.35s**.
+  - Total unit test suite: **73 / 73 passed in 53.45s** across 11 test suites.
 
 - [x] **Unit Test Suite Verification (73 / 73 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
