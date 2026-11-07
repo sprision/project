@@ -108,9 +108,13 @@
   - `GET /api/eval/cv` (New)
   - `GET /api/eval/calibration` (New)
 
-### 8. Frontend Dashboard
+### 8. Frontend Dashboard & Guided Demonstration Experience
 - **Status:** Complete & Verified (`frontend/index.html`).
 - **Features:** Dark industrial UI with overview dashboard, image upload, PaDiM inference trigger, heatmap viewing, defect region details, KB search, document ingestion, inspection history table, report viewer, and JSON download. Dynamically loads CV evaluation and calibration metrics from `/api/eval/`.
+- **Guided Demo Tour & One-Click Samples:**
+  - Integrated **⚡ One-Click Demo Samples** toolbar in the Image Upload card with 9 pre-packaged industrial samples (`bottle`, `cable`, `metal_nut`, `screw`), auto-configuring image, category, and question.
+  - Added **🚀 Guided Demo Tour** interactive walkthrough modal (`demo-tour-modal`) accessible from topbar and upload zone, explaining decision support scope, 3-level precedence hierarchy, and providing direct category launchers.
+  - Created `demo_samples/` repository with `demo_samples/README.md` documenting expected scores, thresholds, and inspection actions.
 - **Decision-Support Enhancements:**
   - Persistent global authority notice banner establishing decision-support boundaries (not an autonomous quality authority).
   - Explicit non-probabilistic score presentation: raw Mahalanobis distances and threshold margins clearly explained.
@@ -129,7 +133,7 @@
   - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 74 / 74 passing unit tests across all 11 test suites (48.38s runtime):
+- **Status:** 74 / 74 passing unit tests across all 11 test suites (40.02s runtime):
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
@@ -143,7 +147,16 @@
   - `test_agent.py`: 10 passed (agent loop with dict retrieval and tool dispatch)
 
 ### 10. Deployment Strategy
-- **Status:** Complete.
-- `Dockerfile`: Multi-stage, CPU PyTorch wheel, libgl1/libglib2.0-0, healthcheck probe.
-- `.dockerignore`: Configured.
-- `docker-compose.yml`: Configured with persistent volumes.
+- **Status:** Complete & Verified.
+- **Single-Command Launchers:**
+  - `run.py`: Cross-platform Python launcher with argument parsing (`--host`, `--port`, `--reload`) and prerequisite directory validation.
+  - `launch.bat`: Windows batch double-click launcher automatically resolving virtual environment.
+  - `launch.ps1`: Windows PowerShell launcher with formatted diagnostic output.
+- **Docker Packaging:**
+  - `Dockerfile`: Multi-stage system libraries (`libgl1`, `libglib2.0-0`), CPU PyTorch wheel for portable execution, healthcheck probe.
+  - `.dockerignore`: Configured.
+  - `docker-compose.yml`: Configured with persistent volumes.
+- **Environment Configuration:**
+  - Comprehensive `.env.example` template with zero mandatory external API keys and safe offline defaults (`HF_HUB_OFFLINE=1`).
+- **Comprehensive Documentation:**
+  - Root `README.md` fully rewritten with architecture diagrams, 4-category inventory, empirical benchmark tables, latency profiles, factory vs benchmark gap analysis, and API reference.

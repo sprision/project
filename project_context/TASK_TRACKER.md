@@ -17,6 +17,29 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
+- [x] **Final Deployment, Demonstration & Delivery Milestone**
+  - **Reproducible Windows Setup & Launcher:**
+    - Authored single-command cross-platform entrypoint `run.py` (`python run.py --host 127.0.0.1 --port 8000`).
+    - Added one-click Windows launchers `launch.bat` and `launch.ps1`.
+    - Documented clean environment installation (Python 3.12, PyTorch CUDA 12.6 or CPU wheel) and safe environment configuration (`.env.example` with zero mandatory API keys).
+    - Hardened Docker support (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) without disrupting Windows workflows.
+  - **Guided Demo Experience & Representative Samples:**
+    - Created `demo_samples/` and `frontend/demo_samples/` with 9 pre-packaged industrial test images across all four categories:
+      - Bottle: `bottle_normal.png` (Clean, score ~13.5) & `bottle_defective_broken_large.png` (Fracture, score ~64.90).
+      - Cable: `cable_normal.png` (Clean, score ~18.95), `cable_defective_missing_wire.png` (Strand break, continuity alert), & `cable_defective_poke_insulation.png` (Puncture, score ~54.11).
+      - Metal Nut: `metal_nut_normal.png` (Clean, score ~14.1) & `metal_nut_defective_bent.png` (Deformed hex, score ~38.45).
+      - Screw: `screw_normal.png` (Clean, score ~18.2) & `screw_defective_scratch_head.png` (Head scratch, score ~34.80).
+    - Authored `demo_samples/README.md` documenting expected scores, thresholds, and inspection actions.
+    - Integrated **⚡ One-Click Demo Samples** toolbar directly into the Image Upload card on the New Inspection page.
+    - Added **🚀 Guided Demo Tour** modal (`demo-tour-modal`) in `frontend/index.html` with interactive category launchers, 3-level precedence explanations, and authority boundary reminders.
+  - **Comprehensive Production Documentation:**
+    - Completely overhauled root `README.md` into an exhaustive, publication-grade manual covering architecture, features, 4-category inventory, empirical benchmarks (held-out vs calibration), detailed latency percentiles, real-world factory vs benchmark gap analysis, setup, launcher scripts, REST API reference, and verification.
+  - **Final Regression & Verification:**
+    - Verified full unit test suite: **74 / 74 passed in 40.02s**.
+    - Verified product readiness verification script (`scratch/verify_product_readiness.py`): all 5 steps passed.
+    - Verified application startup path and dynamic model registry initialization across all 4 categories (`bottle`, `cable`, `metal_nut`, `screw`) on `cuda`.
+    - Preserved all historical benchmark records and model artifacts strictly intact.
+
 - [x] **Final Decision Logic & Product Readiness Pass**
   - **Explicit 3-Level Precedence Enforcement in `src/app/reporting/report.py`:**
     - Level 1 (`uncertain_human_review`) evaluated first: triggers on borderline proximity ($|\Delta| < 3.0$) OR detector disagreement (e.g. specialized detector trigger while PaDiM is nominal).

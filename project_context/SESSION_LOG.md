@@ -422,6 +422,37 @@
 
 ---
 
+### Session 14: Final Deployment, Demonstration & Delivery Milestone
+- **Date & Local Time:** 2026-11-07T18:30:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Prepare a reproducible Windows setup and single-command application launchers (`run.py`, `launch.bat`, `launch.ps1`).
+  2. Configure environment variables safely with complete offline defaults (`.env.example`).
+  3. Prepare representative normal and defective samples for all 4 categories (`demo_samples/` and `frontend/demo_samples/`).
+  4. Enrich dashboard with a One-Click Demo Samples toolbar and an interactive Guided Demo Tour modal.
+  5. Author comprehensive, publication-grade `README.md` covering architecture, benchmarks, latency, API, factory vs benchmark gap, and reproduction commands.
+  6. Execute final regression (74 / 74 unit tests passing, product readiness script, application startup verification) and preserve all existing models, datasets, and benchmark files.
+- **Key Implementation & Verification Results:**
+  1. **Single-Command Launchers & Environment:**
+     - Created `run.py` supporting optional CLI arguments (`--host`, `--port`, `--reload`, `--workers`), auto-creating runtime directories, and displaying startup diagnostics.
+     - Created `launch.bat` and `launch.ps1` for native one-click execution on Windows.
+     - Updated `.env.example` with safe offline defaults (`HF_HUB_OFFLINE=1`, `APP_LLM_PROVIDER=none`, zero required external keys).
+  2. **Representative Demo Experience:**
+     - Created `demo_samples/` and `frontend/demo_samples/` with 9 representative images across all 4 categories (`bottle_normal.png`, `bottle_defective_broken_large.png`, `cable_normal.png`, `cable_defective_missing_wire.png`, `cable_defective_poke_insulation.png`, `metal_nut_normal.png`, `metal_nut_defective_bent.png`, `screw_normal.png`, `screw_defective_scratch_head.png`).
+     - Authored `demo_samples/README.md` detailing expected scores, thresholds, and inspection actions.
+     - Added **⚡ One-Click Demo Samples** toolbar in `frontend/index.html` loading images directly into the browser canvas via File/Blob API.
+     - Added **🚀 Guided Demo Tour** modal (`demo-tour-modal`) walking users through decision support boundaries, the 3-level precedence hierarchy, and 1-click category launchers.
+  3. **Comprehensive Documentation (`README.md`):**
+     - Authored complete architecture diagram, 4-category model inventory, strict held-out benchmark tables (254 images), 3-way multi-detector cable comparison table, latency profiles (P50/P95), factory vs benchmark gap analysis, setup guides, REST API reference, and reproduction instructions.
+  4. **Regression & Quality Verification:**
+     - Unit test suite: **74 / 74 passed in 40.02s**.
+     - Product readiness verification script (`scratch/verify_product_readiness.py`): all 5 steps passed.
+     - Verified application service initialization: loaded categories `['bottle', 'cable', 'metal_nut', 'screw']` on `cuda`.
+     - Preserved all historical benchmark records and model artifacts strictly intact.
+
+
+---
+
 ### Session 11: Multi-Detector Decision Integrity, Provenance & Reporting System Polish
 - **Date & Local Time:** 2026-11-07T15:55:00+05:30
 - **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
@@ -536,3 +567,34 @@
   5. **Unit Test Suite:**
      - **74 / 74 tests passed in 48.38s** across 11 unit test suites.
 - **Preservation Check:** All existing production models and historical benchmark records strictly preserved. Zero tuning against held-out labels.
+
+---
+
+### Session 14: Final Deployment, Demonstration & Delivery Milestone
+- **Date & Local Time:** 2026-11-07T18:30:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Prepare a reproducible Windows setup and single-command application launchers (`run.py`, `launch.bat`, `launch.ps1`).
+  2. Configure environment variables safely with complete offline defaults (`.env.example`).
+  3. Prepare representative normal and defective samples for all 4 categories (`demo_samples/` and `frontend/demo_samples/`).
+  4. Enrich dashboard with a One-Click Demo Samples toolbar and an interactive Guided Demo Tour modal.
+  5. Author comprehensive, publication-grade `README.md` covering architecture, benchmarks, latency, API, factory vs benchmark gap, and reproduction commands.
+  6. Execute final regression (74 / 74 unit tests passing, product readiness script, application startup verification) and preserve all existing models, datasets, and benchmark files.
+- **Key Implementation & Verification Results:**
+  1. **Single-Command Launchers & Environment:**
+     - Created `run.py` supporting optional CLI arguments (`--host`, `--port`, `--reload`, `--workers`), auto-creating runtime directories, and displaying startup diagnostics.
+     - Created `launch.bat` and `launch.ps1` for native one-click execution on Windows.
+     - Updated `.env.example` with safe offline defaults (`HF_HUB_OFFLINE=1`, `APP_LLM_PROVIDER=none`, zero required external keys).
+  2. **Representative Demo Experience:**
+     - Created `demo_samples/` and `frontend/demo_samples/` with 9 representative images across all 4 categories (`bottle_normal.png`, `bottle_defective_broken_large.png`, `cable_normal.png`, `cable_defective_missing_wire.png`, `cable_defective_poke_insulation.png`, `metal_nut_normal.png`, `metal_nut_defective_bent.png`, `screw_normal.png`, `screw_defective_scratch_head.png`).
+     - Authored `demo_samples/README.md` detailing expected scores, thresholds, and inspection actions.
+     - Added **⚡ One-Click Demo Samples** toolbar in `frontend/index.html` loading images directly into the browser canvas via File/Blob API.
+     - Added **🚀 Guided Demo Tour** modal (`demo-tour-modal`) walking users through decision support boundaries, the 3-level precedence hierarchy, and 1-click category launchers.
+  3. **Comprehensive Documentation (`README.md`):**
+     - Authored complete architecture diagram, 4-category model inventory, strict held-out benchmark tables (254 images), 3-way multi-detector cable comparison table, latency profiles (P50/P95), factory vs benchmark gap analysis, setup guides, REST API reference, and reproduction instructions.
+  4. **Regression & Quality Verification:**
+     - Unit test suite: **74 / 74 passed in 40.02s**.
+     - Product readiness verification script (`scratch/verify_product_readiness.py`): all 5 steps passed.
+     - Verified application service initialization: loaded categories `['bottle', 'cable', 'metal_nut', 'screw']` on `cuda`.
+     - Preserved all historical benchmark records and model artifacts strictly intact.
+
