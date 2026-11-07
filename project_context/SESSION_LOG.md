@@ -66,3 +66,31 @@
 - **Next Steps:**
   - To launch the web application for live user interaction:
     Run `.\.venv\Scripts\uvicorn.exe src.app.main:app --host 0.0.0.0 --port 8000` (outside sandbox for external browser access).
+
+---
+
+### Session 3: Report Generation Data-Contract Bug Fix & Regression Testing
+- **Date & Local Time:** 2026-11-07T13:00:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:** Fix `AttributeError: 'dict' object has no attribute 'chunks'` occurring during report generation in end-to-end inspection pipeline.
+- **Root Cause Analysis:**
+  - In `src/app/agent/agent.py`, when invoking the `generate_inspection_report` tool, the agent serialized the retrieval result as a dict: `retrieval.model_dump() if retrieval else None`.
+  - In `src/app/agent/tools.py`, `_t_report` forwarded `args.get("retrieval")` (dict) directly into `ctx.report_fn`.
+  - In `src/app/reporting/report.py`, `_deterministic()` checked `if retrieval and not retrieval.chunks:`, causing python to throw an `AttributeError` on the raw dict.
+- **Code Changes:**
+  1. `src/app/agent/tools.py`:
+     - Updated `_t_report` to deserialize dictionary `retrieval` to `RetrievalResult(**ret_arg)`.
+     - Ensured `evidence` items in list are converted to `EvidenceItem` if dicts.
+     - Updated `_ReportArgs` schema to allow `dict | Any`.
+  2. `src/app/reporting/report.py`:
+     - Updated `generate()` and `_deterministic()` with defense-in-depth coercion: `if isinstance(retrieval, dict): retrieval = RetrievalResult(**retrieval)`.
+     - Used safe chunk access `chunks = getattr(retrieval, "chunks", None)`.
+  3. `tests/unit/test_report.py`:
+     - Added `test_regression_retrieval_as_dict`: verifies report generation succeeds when `retrieval` is passed as a dict.
+     - Added `test_regression_retrieval_as_dict_empty_chunks`: verifies dict with empty chunks properly appends limitation.
+  4. `tests/unit/test_agent.py`:
+     - Added `test_regression_generate_report_with_dict_retrieval`: verifies `run_tool("generate_inspection_report", ...)` handles dict retrieval and returns `InspectionReport`.
+- **Verification Results:**
+  - Full unit test suite: **43 / 43 passed** in 33.41s across all 8 suites (`test_schemas.py`, `test_db.py`, `test_ingest.py`, `test_report.py`, `test_vision_validation.py`, `test_threshold_calibration.py`, `test_retriever.py`, `test_agent.py`).
+  - End-to-end inspection pipeline verified on defective MVTec AD bottle (`data/raw/mvtec_ad/bottle/test/broken_large/000.png`): All tool calls succeeded (`inspect_image`, `retrieve_technical_documents`, `summarize_evidence`, `generate_inspection_report`), SQLite database recorded the report, and report JSON export is verified.
+- **Preservation Check:** All existing models (`data/index/vision/`) and evaluation benchmarks (`runs/`) remain intact.

@@ -134,12 +134,26 @@ def _t_summarize(args: dict, ctx: ToolContext,
 def _t_report(args: dict, ctx: ToolContext,
               vision: VisionResult | None) -> InspectionReport:
     """Assemble the final InspectionReport from accumulated evidence."""
+    ret_arg = args.get("retrieval")
+    ret_obj = None
+    if isinstance(ret_arg, RetrievalResult):
+        ret_obj = ret_arg
+    elif isinstance(ret_arg, dict):
+        ret_obj = RetrievalResult(**ret_arg)
+
+    evidence_items = []
+    for e in (args.get("evidence") or []):
+        if isinstance(e, EvidenceItem):
+            evidence_items.append(e)
+        elif isinstance(e, dict):
+            evidence_items.append(EvidenceItem(**e))
+
     return ctx.report_fn(
         image_id=args.get("image_id") or (vision.image_id if vision else "unknown"),
         question=args.get("question", ""),
         vision=vision,
-        retrieval=args.get("retrieval"),
-        evidence=[EvidenceItem(**e) for e in (args.get("evidence") or [])],
+        retrieval=ret_obj,
+        evidence=evidence_items,
         trace=args.get("trace") or [],
     )
 
@@ -177,8 +191,8 @@ class _SummarizeArgs(BaseModel):
 class _ReportArgs(BaseModel):
     image_id: str | None = None
     question: str = ""
-    evidence: list[dict] = field(default_factory=list)
-    retrieval: dict | None = None
+    evidence: list[dict | Any] = field(default_factory=list)
+    retrieval: dict | Any | None = None
     trace: list[dict] = field(default_factory=list)
 
 

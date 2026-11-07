@@ -26,7 +26,19 @@
 
 ---
 
-### 4. Git Large File Storage (LFS) for PaDiM Pickles
+### 4. Report Generation Data-Contract Mismatch (Resolved)
+- **Component:** `src/app/agent/tools.py` (`_t_report`) & `src/app/reporting/report.py` (`generate()`, `_deterministic()`)
+- **Description:** When the inspection agent deliberated and executed `generate_inspection_report`, it serialized the retrieval result as a dict (`retrieval.model_dump() if retrieval else None`). The tool implementation `_t_report` forwarded this dictionary directly to `report_fn` without deserializing. When `_deterministic()` attempted `if retrieval and not retrieval.chunks:`, it failed with:
+  `AttributeError: 'dict' object has no attribute 'chunks'`.
+- **Status:** **Resolved.**
+  1. Updated `_t_report` in `src/app/agent/tools.py` to deserialize dictionary `retrieval` arguments into `RetrievalResult(**ret_arg)` and ensure `evidence` items are coerced to `EvidenceItem`.
+  2. Updated `generate()` and `_deterministic()` in `src/app/reporting/report.py` to defensively coerce dictionary inputs to `RetrievalResult(**retrieval)` and use safe `getattr(retrieval, "chunks", None)` / `.get("chunks", [])` chunk extraction.
+  3. Added regression tests in `tests/unit/test_report.py` (`test_regression_retrieval_as_dict`, `test_regression_retrieval_as_dict_empty_chunks`) and `tests/unit/test_agent.py` (`test_regression_generate_report_with_dict_retrieval`).
+  4. Verified all 43 unit tests passing.
+
+---
+
+### 5. Git Large File Storage (LFS) for PaDiM Pickles
 - **Component:** `data/index/vision/{category}/padim.pkl`
 - **Description:** Each fitted PaDiM model file is approximately 662 MB (combined total ~1.98 GB across bottle, cable, and metal_nut).
 - **Impact:** Exceeds standard Git 100 MB single-file push limits on platforms like GitHub.
@@ -34,7 +46,7 @@
 
 ---
 
-### 5. Windows PowerShell Syntax Sensitivity
+### 6. Windows PowerShell Syntax Sensitivity
 - **Component:** Terminal tooling
 - **Description:** Using Linux/POSIX command chaining syntax (e.g. `&&`) in standard Windows PowerShell triggers parser errors (`The token '&&' is not a valid statement separator in this version`).
 - **Mitigation:** Use PowerShell statement separator `;` or run individual commands.

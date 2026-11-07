@@ -56,7 +56,7 @@
 
 ### 6. Reporting Layer
 - **Status:** Complete & Verified.
-- **Deterministic Generator:** Verified in `src/app/reporting/report.py` (cites evidence, classifies items into visual observations, retrieved facts, hypotheses, recommendations, limitations, and mandatory disclaimer).
+- **Deterministic Generator:** Verified in `src/app/reporting/report.py` (cites evidence, classifies items into visual observations, retrieved facts, hypotheses, recommendations, limitations, and mandatory disclaimer). Handles both object and dict serialized forms of `retrieval` and `evidence`.
 - **Optional LLM Generator:** Present for OpenAI / Gemini with deterministic fallback if keys are missing or API fails.
 
 ### 7. FastAPI Backend & API Surface
@@ -79,15 +79,15 @@
 - **Features:** Dark industrial UI with overview dashboard, image upload, PaDiM inference trigger, heatmap viewing, defect region details, KB search, document ingestion, inspection history table, report viewer, and JSON download. Dynamically loads CV evaluation and calibration metrics from `/api/eval/`.
 
 ### 9. Test Suite Verification
-- **Status:** 40 / 40 passing unit tests.
+- **Status:** 43 / 43 passing unit tests across all 8 suites:
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
-  - `test_report.py`: 5 passed
+  - `test_report.py`: 7 passed (includes 2 regression tests for dict retrieval)
   - `test_vision_validation.py`: 5 passed
   - `test_threshold_calibration.py`: 6 passed
   - `test_retriever.py`: 4 passed
-  - `test_agent.py`: 9 passed
+  - `test_agent.py`: 10 passed (includes 1 regression test for agent report generation tool with dict retrieval)
 
 ### 10. Deployment Strategy
 - **Status:** Complete.

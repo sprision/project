@@ -17,16 +17,22 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (40 / 40 Passed)**
+- [x] **Unit Test Suite Verification (43 / 43 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
-  - `tests/unit/test_report.py`: 5 passed (0.55s)
+  - `tests/unit/test_report.py`: 7 passed (0.70s) [Added 2 regression tests for dict-serialized retrieval]
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
   - `tests/unit/test_threshold_calibration.py`: 6 passed (14.81s)
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
-  - `tests/unit/test_agent.py`: 9 passed (41.19s)
-  - Total: **40 passing tests** across 8 unit test suites.
+  - `tests/unit/test_agent.py`: 10 passed (32.76s) [Added 1 regression test for tool report assembly]
+  - Total: **43 passing tests** across 8 unit test suites.
+
+- [x] **Report Generation Data-Contract Bug Fix**
+  - Identified data-contract mismatch where `agent.py` serialized `RetrievalResult` into a dictionary when invoking `generate_inspection_report`, causing `_t_report` to pass a dict to `ReportGenerator._deterministic` which accessed `retrieval.chunks` directly (`AttributeError: 'dict' object has no attribute 'chunks'`).
+  - Implemented defense-in-depth deserialization and coercion in both `src/app/agent/tools.py` (`_t_report`) and `src/app/reporting/report.py` (`generate()`, `_deterministic()`).
+  - Added 3 regression tests covering dict retrieval inputs, empty chunks handling, and agent tool execution.
+  - Verified full inspection pipeline with report generation and SQLite persistence.
 
 - [x] **Live End-to-End Inference & Pipeline Verification**
   - Executed end-to-end inspection on sample defective MVTec AD bottle (`data/raw/mvtec_ad/bottle/test/broken_large/000.png`):

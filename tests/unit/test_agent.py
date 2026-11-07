@@ -53,6 +53,36 @@ class TestToolDispatch:
         r = run_tool("compare_inspection_results", {}, _ctx(tmp_path), None)
         assert not r.ok and "needs a current vision result" in r.error
 
+    def test_regression_generate_report_with_dict_retrieval(self, tmp_workspace, tmp_path):
+        ret_dict = {
+            "query": "defect query",
+            "chunks": [
+                {
+                    "chunk": {
+                        "chunk_id": "c1", "doc_id": "d1", "title": "Doc",
+                        "text": "sample text", "source": "doc.txt"
+                    },
+                    "score": 0.9, "rank": 1
+                }
+            ],
+            "mode": "hybrid",
+            "note": None
+        }
+        r = run_tool("generate_inspection_report", {
+            "image_id": "sample",
+            "question": "is there a defect?",
+            "retrieval": ret_dict,
+            "evidence": [
+                {"kind": "visual_observation", "statement": "Anomaly found", "source": "model"}
+            ],
+            "trace": []
+        }, _ctx(tmp_path), _vision())
+        assert r.ok, f"generate_inspection_report failed: {r.error}"
+        from src.app.schemas import InspectionReport
+        assert isinstance(r.output, InspectionReport)
+        assert r.output.retrieval is not None
+        assert len(r.output.retrieval.chunks) == 1
+
 
 class TestAgentDecisions:
     """Verify the agent CHOOSES tools appropriately for different questions."""

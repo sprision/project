@@ -20,9 +20,11 @@ class ReportGenerator:
     # ---------------- public ----------------
     def generate(self, image_id: str, question: str,
                  vision: VisionResult | None,
-                 retrieval: RetrievalResult | None,
+                 retrieval: RetrievalResult | dict | None,
                  evidence: list[EvidenceItem],
                  trace: list[dict]) -> InspectionReport:
+        if isinstance(retrieval, dict):
+            retrieval = RetrievalResult(**retrieval)
         if self.s.llm_provider in {"openai", "gemini"}:
             try:
                 return self._llm_report(image_id, question, vision, retrieval,
@@ -41,18 +43,21 @@ class ReportGenerator:
     # ---------------- deterministic ----------------
     def _deterministic(self, image_id, question, vision, retrieval,
                        evidence, trace) -> InspectionReport:
+        if isinstance(retrieval, dict):
+            retrieval = RetrievalResult(**retrieval)
         findings: list[EvidenceItem] = []
         recs: list[EvidenceItem] = []
         limits: list[str] = []
 
         for e in evidence:
-            if e.kind in (EvidenceKind.VISUAL_OBSERVATION,
+            item = EvidenceItem(**e) if isinstance(e, dict) else e
+            if item.kind in (EvidenceKind.VISUAL_OBSERVATION,
                           EvidenceKind.RETRIEVED_FACT,
                           EvidenceKind.INSPECTION_HISTORY,
                           EvidenceKind.HYPOTHESIS):
-                findings.append(e)
-            elif e.kind == EvidenceKind.LIMITATION:
-                limits.append(e.statement)
+                findings.append(item)
+            elif item.kind == EvidenceKind.LIMITATION:
+                limits.append(item.statement)
 
         if vision is not None:
             if vision.is_anomalous:
@@ -93,10 +98,14 @@ class ReportGenerator:
                 statement="Re-upload a valid, in-focus image of the equipment "
                           "surface and re-run the inspection.", source="system"))
 
-        if retrieval and not retrieval.chunks:
-            limits.append("No supporting passages were retrieved from the "
-                          "knowledge base; recommendations are based on the "
-                          "visual result only.")
+        if retrieval is not None:
+            chunks = getattr(retrieval, "chunks", None)
+            if chunks is None and isinstance(retrieval, dict):
+                chunks = retrieval.get("chunks", [])
+            if not chunks:
+                limits.append("No supporting passages were retrieved from the "
+                              "knowledge base; recommendations are based on the "
+                              "visual result only.")
 
         if not limits:
             limits.append("Deterministic generator; scores are model outputs, "
