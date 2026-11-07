@@ -100,11 +100,26 @@ def main() -> None:
     if not cats or cats == [None]:
         ap.error("provide --category or --all")
 
-    results = [eval_category(raw_root, c, device, args.limit) for c in cats]
+    new_results = [eval_category(raw_root, c, device, args.limit) for c in cats]
     out = s.runs_dir / "eval_cv.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"results": results}, indent=2))
-    for r in results:
+
+    # Merge with existing evaluation results if single category evaluated
+    merged_results = []
+    if out.exists() and not args.all:
+        try:
+            existing_data = json.loads(out.read_text(encoding="utf-8"))
+            existing_cats = {r["category"]: r for r in existing_data.get("results", [])}
+            for nr in new_results:
+                existing_cats[nr["category"]] = nr
+            merged_results = list(existing_cats.values())
+        except Exception:
+            merged_results = new_results
+    else:
+        merged_results = new_results
+
+    out.write_text(json.dumps({"results": merged_results}, indent=2) + "\n")
+    for r in new_results:
         print(json.dumps(r))
 
 

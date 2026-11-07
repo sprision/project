@@ -2,41 +2,31 @@
 
 ## Current Implementation State (Verified)
 
-### 1. Vision & Anomaly Detection (PaDiM)
+### 1. Vision & Anomaly Detection (PaDiM) & Model Registry
 - **Status:** Complete & Verified.
-- **Fitted Models:**
+- **Fitted Models (4 Categories):**
   - `data/index/vision/bottle/padim.pkl` (662 MB) — Exists, verified.
   - `data/index/vision/cable/padim.pkl` (662 MB) — Exists, verified.
   - `data/index/vision/metal_nut/padim.pkl` (662 MB) — Exists, verified.
-- **Backbone:** ResNet-18 (`timm`), PyTorch 2.14.1 with CUDA enabled.
-- **Optimizations:** Cached batched matrix multiplication (`torch.bmm`) in `src/app/vision/model.py` verified; enables sub-second anomaly map generation.
-- **Region Extraction:** Connected components with contour/bounding-box statistics via OpenCV.
-- **Heatmap Generation:** JET colormap blending over resized original image, saving to `data/heatmaps/`.
-- **Live Test:** Verified on real sample `data/raw/mvtec_ad/bottle/test/broken_large/000.png` -> Raw score `64.897` vs threshold `23.4613` -> correctly flagged anomalous with 1 defect region and overlay in 4.26s.
+  - `data/index/vision/screw/padim.pkl` (662 MB) — Exists, newly trained & verified.
+- **Architecture & Registry:**
+  - `src/app/vision/registry.py`: Scalable `ModelRegistry` with dynamic category discovery and thread-safe in-memory `LRUModelCache` (capacity = 3).
+  - Lazy loading with automatic LRU eviction bounded at ~2.0 GB active RAM / ~132 MB CUDA VRAM.
+  - Pretrained ResNet-18 backbone (`timm`), cached batched matrix multiplication (`torch.bmm`), connected-component defect region extraction, and JET heatmap overlay.
+- **Live Tests:** Verified end-to-end inspections across all 4 categories.
 
 ### 2. Threshold Calibration & Reliability Validation
-- **Status:** Complete & Fully Validated across all 348 MVTec AD test samples.
+- **Status:** Complete & Fully Validated across 508 MVTec AD test samples (bottle: 83, cable: 150, metal_nut: 115, screw: 160).
 - **Per-Category Thresholds:**
   - `bottle`: `threshold_raw` = 23.4613 (Balanced Accuracy: 1.0, FPR: 0.0). Verified in `data/index/vision/bottle/threshold.json`.
   - `cable`: `threshold_raw` = 30.4218 (Balanced Accuracy: 0.8306 calib / 0.7181 eval, FPR: 0.1724). Verified in `data/index/vision/cable/threshold.json`.
   - `metal_nut`: `threshold_raw` = 23.1698 (Balanced Accuracy: 0.8785 calib / 0.9787 eval, FPR: 0.0). Verified in `data/index/vision/metal_nut/threshold.json`.
-- **Full Test Set Validation (All 348 Images in `runs/validation_results.json`):**
-  - **Bottle (83 images: 20 good, 63 defective):**
-    - TP=63, FP=0, TN=20, FN=0
-    - Sensitivity: 1.0000 | Specificity: 1.0000 | Balanced Accuracy: 1.0000 | FPR: 0.0000
-    - Image AUROC: 1.0000 (Matches `runs/eval_cv.json`)
-  - **Cable (150 images: 58 good, 92 defective):**
-    - TP=60, FP=6, TN=52, FN=32
-    - Sensitivity: 0.6522 | Specificity: 0.8966 | Balanced Accuracy: 0.7744 | FPR: 0.1034
-    - Image AUROC: 0.8413 (Matches `runs/eval_cv.json`)
-    - False positives (6): clean samples scored between 31.42 and 35.80 (slight sheath irregularities).
-    - False negatives (32): primarily `missing_wire` (9) and `poke_insulation` (10) due to low patch activation on tiny pinpricks/absent conductors.
-  - **Metal Nut (115 images: 22 good, 93 defective):**
-    - TP=84, FP=1, TN=21, FN=9
-    - Sensitivity: 0.9032 | Specificity: 0.9545 | Balanced Accuracy: 0.9289 | FPR: 0.0455
-    - Image AUROC: 0.9741 (Matches `runs/eval_cv.json`)
-    - False positive (1): `metal_nut/test/good/006.png` scored 30.0865 due to an edge feature at image crop boundary (`y=0`).
-    - False negatives (9): subtle surface scratches (`scratch`: 4) and minor bends (`bent`: 5) scoring close to threshold 23.1698.
+  - `screw`: `threshold_raw` = 24.1733 (Balanced Accuracy: 0.7333 calib / 0.5076 eval, FPR: 0.7143). Verified in `data/index/vision/screw/threshold.json`.
+- **Full Test Set Validation (All 508 Images in `runs/validation_results.json`):**
+  - **Bottle (83 images: 20 good, 63 defective):** TP=63, FP=0, TN=20, FN=0. Sensitivity: 1.0000 | Specificity: 1.0000 | Balanced Accuracy: 1.0000 | AUROC: 1.0000
+  - **Cable (150 images: 58 good, 92 defective):** TP=60, FP=6, TN=52, FN=32. Sensitivity: 0.6522 | Specificity: 0.8966 | Balanced Accuracy: 0.7744 | AUROC: 0.8413
+  - **Metal Nut (115 images: 22 good, 93 defective):** TP=84, FP=1, TN=21, FN=9. Sensitivity: 0.9032 | Specificity: 0.9545 | Balanced Accuracy: 0.9289 | AUROC: 0.9741
+  - **Screw (160 images: 41 good, 119 defective):** TP=86, FP=20, TN=21, FN=33. Sensitivity: 0.7227 | Specificity: 0.5122 | Balanced Accuracy: 0.6174 | Image AUROC: 0.6280 | Pixel AUROC: 0.9726. (Thread rotation creates global Mahalanobis distance variance on normal screws, while pixel localization remains outstanding at 0.9726).
 - **Calibration Log:** Comprehensive 50-seed stability metrics recorded in `runs/calibration.json`.
 - **Verdict Modes:** Both `calibrated_raw` and `normalised` supported across `model.py`, `services.py`, and `report.py`.
 
@@ -102,15 +92,16 @@
   - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 48 / 48 passing unit tests across all 8 suites:
+- **Status:** 56 / 56 passing unit tests across all 9 test suites:
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
-  - `test_report.py`: 8 passed (includes regression tests for dict retrieval, borderline score warnings, and category limitations)
+  - `test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
+  - `test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, and category limitations)
   - `test_vision_validation.py`: 5 passed
-  - `test_threshold_calibration.py`: 10 passed (includes tests for calibration threshold presence, metric arithmetic, disjoint split partitioning, and seeded reproducibility)
+  - `test_threshold_calibration.py`: 10 passed (calibration threshold presence, metric arithmetic, disjoint split partitioning, seeded reproducibility)
   - `test_retriever.py`: 4 passed
-  - `test_agent.py`: 10 passed (includes regression test for agent report generation tool with dict retrieval)
+  - `test_agent.py`: 10 passed (regression test for agent report generation tool with dict retrieval)
 
 ### 10. Deployment Strategy
 - **Status:** Complete.

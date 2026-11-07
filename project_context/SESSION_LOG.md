@@ -186,3 +186,39 @@
      - Core API routes (`GET /api/categories`, `POST /api/inspect`) and frontend dropdown require zero code modifications.
 - **Context Updates:** Documented in `ARCHITECTURE.md`, `DECISIONS.md`, `TASK_TRACKER.md`, and `SESSION_LOG.md`.
 - **Preservation Check:** All existing models and evaluation benchmarks strictly untouched; no training executed in this turn.
+
+---
+
+### Session 7: Scalable Model Registry Implementation & MVTec AD `screw` Integration
+- **Date & Local Time:** 2026-11-07T14:27:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:** Implement Phase 1 (ModelRegistry, LRU cache capacity=3, memory tracking) and Phase 2 (MVTec AD `screw` category download, PaDiM fit, threshold calibration, CV evaluation, validation, and dashboard integration).
+- **Phase 1 Implementation:**
+  - Created `src/app/vision/registry.py` with `ModelRegistry`, `LRUModelCache`, `CategoryMetadata`, and `get_process_memory_mb()`.
+  - Updated `InspectionService` (`services.py`) to manage models through the registry cache.
+  - Added API endpoints: `GET /api/categories`, `GET /api/categories/metadata`, `GET /api/system/cache`.
+  - Added unit test suite `tests/unit/test_model_registry.py` (8 passing tests).
+- **Phase 2 Implementation & Actual Measured Metrics:**
+  - **Dataset:** Downloaded 599 PNG files for MVTec AD `screw` from `foersben/mvtec-ad` (320 train normal, 160 test: 41 good, 119 defective).
+  - **Training:** Fitted PaDiM on 320 train images in **103.5s on CUDA GPU** (normalization: [11.30, 15.49], saved to `data/index/vision/screw/padim.pkl`, 661.9 MB).
+  - **Calibration:** Executed seeded 50/50 split and 50-seed Monte Carlo sweep in **19.7s on CUDA GPU** (`threshold_raw` = 24.1733, balanced accuracy = 0.7333 calibration / 0.5076 evaluation, FPR = 0.7143).
+  - **Computer Vision Benchmarking:** Evaluated 160 test images in **17.3s on CUDA GPU**:
+    - **Image AUROC: 0.6280**
+    - **Pixel AUROC: 0.9726**
+  - **Validation Report Across 160 Test Samples:**
+    - Confusion Matrix: TP = 86, FP = 20, TN = 21, FN = 33
+    - Sensitivity: 0.7227 | Specificity: 0.5122 | FPR: 0.4878 | Balanced Accuracy: 0.6174
+    - Breakdown by Defect: `manipulated_front` 24/24 (100% recall, 0 errors, mean 32.70), `thread_top` 18/23 (mean 27.56), `scratch_head` 19/24 (mean 26.54), `thread_side` 12/23 (mean 26.14), `scratch_neck` 13/25 (mean 24.62). Clean screws (`good`: 21/41 normal, 20 false positives, mean 25.12).
+    - Domain Finding: Arbitrary screw thread rotational orientation elevates patch feature Mahalanobis distances on normal screws, while pixel localization is outstanding at 0.9726.
+  - **Empirical Memory & LRU Eviction Measurements:**
+    - Baseline: RAM 650.45 MB | CUDA 0.0 MB
+    - 1 Model (`bottle`): RAM 1431.28 MB | CUDA 42.69 MB
+    - 2 Models (`bottle`, `cable`): RAM 2065.50 MB | CUDA 87.12 MB
+    - 3 Models (`bottle`, `cable`, `metal_nut` — Full Cache): RAM 2660.59 MB | CUDA 130.68 MB
+    - 4th Model (`screw`): **Oldest model (`bottle`) safely evicted!**
+    - Active Cache: `['cable', 'metal_nut', 'screw']`
+    - Post-eviction working set: RAM 2688.72 MB | CUDA 131.56 MB (bounded at ~2.68 GB RAM and ~131 MB VRAM).
+- **Verification:**
+  - Tested live end-to-end inspection on sample `data/raw/mvtec_ad/screw/test/manipulated_front/000.png`: correctly flagged anomalous with raw score `31.60` vs threshold `24.1733`, 2 regions localized, and heatmap generated.
+  - Full unit test suite: **56 / 56 passed in 37.02s** across 9 test suites.
+- **Preservation Check:** All existing models (`bottle`, `cable`, `metal_nut`), thresholds, and historical benchmarks strictly preserved.

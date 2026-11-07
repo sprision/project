@@ -10,6 +10,7 @@ import shutil
 import uuid
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from ..agent import InspectionAgent
 from ..agent.tools import ToolContext
@@ -18,57 +19,57 @@ from ..database import InspectionDB
 from ..reporting import ReportGenerator
 from ..retrieval import Retriever
 from ..schemas import InspectionReport
-from ..vision import AnomalyInspector, PaDiM, load_calibrated_threshold
+from ..vision import (AnomalyInspector, CategoryMetadata, ModelRegistry,
+                       get_process_memory_mb)
 
 
 class InspectionService:
-    def __init__(self) -> None:
+    def __init__(self, cache_capacity: int = 3) -> None:
         self.s = get_settings()
         self.device = self.s.resolved_device()
         self.retriever = Retriever()
         self.db = InspectionDB()
         self.reporter = ReportGenerator()
-        self._inspectors: dict[str, AnomalyInspector] = {}
         self._upload_dir = self.s.data_dir / "uploads"
         self._upload_dir.mkdir(parents=True, exist_ok=True)
         self._overlay_dir = self.s.data_dir / "heatmaps"
 
+        # Scalable Model Registry with LRU Cache
+        self.registry = ModelRegistry(
+            vision_dir=self.s.index_dir / "vision",
+            cache_capacity=cache_capacity,
+            device=self.device,
+            overlay_dir=self._overlay_dir,
+        )
+
         ctx = ToolContext(
             retriever=self.retriever, db=self.db,
-            inspectors=self._inspectors,
+            inspectors=self.registry.cache,
             report_fn=self.reporter.generate,
             work_dir=self._upload_dir)
         self.agent = InspectionAgent(ctx)
 
-    # -- vision model loading --
+    # -- vision model loading via LRU cache --
     def inspector_for(self, category: str | None) -> AnomalyInspector | None:
-        cat = category or self._default_category()
-        if cat is None:
-            return None
-        if cat not in self._inspectors:
-            model_path = self.s.index_dir / "vision" / cat / "padim.pkl"
-            if not model_path.exists():
-                return None  # model not fitted yet
-            model = PaDiM.load(model_path, device=self.device)
-            calibrated = load_calibrated_threshold(model_path)
-            self._inspectors[cat] = AnomalyInspector(
-                model, cat, calibrated_threshold=calibrated,
-                overlay_dir=self._overlay_dir)
-        return self._inspectors[cat]
+        return self.registry.get_inspector(category)
 
     def _default_category(self) -> str | None:
-        vdir = self.s.index_dir / "vision"
-        if not vdir.exists():
-            return None
-        cats = [p.name for p in vdir.iterdir() if (p / "padim.pkl").exists()]
-        return sorted(cats)[0] if cats else None
+        cats = self.registry.discover_categories()
+        return cats[0] if cats else None
 
     def available_categories(self) -> list[str]:
-        vdir = self.s.index_dir / "vision"
-        if not vdir.exists():
-            return []
-        return sorted(p.name for p in vdir.iterdir()
-                      if (p / "padim.pkl").exists())
+        return self.registry.discover_categories()
+
+    def categories_metadata(self) -> list[dict[str, Any]]:
+        return self.registry.list_all_metadata()
+
+    def cache_stats(self) -> dict[str, Any]:
+        return {
+            "capacity": self.registry.cache.capacity,
+            "cached_models": self.registry.cache.keys(),
+            "stats": self.registry.cache.stats,
+            "memory": get_process_memory_mb(),
+        }
 
     @property
     def heatmap_dir(self) -> Path:

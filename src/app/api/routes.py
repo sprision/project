@@ -36,7 +36,22 @@ def health() -> dict:
 
 @router.get("/categories")
 def categories() -> dict:
-    return {"categories": get_service().available_categories()}
+    svc = get_service()
+    return {
+        "categories": svc.available_categories(),
+        "metadata": svc.categories_metadata(),
+    }
+
+
+@router.get("/categories/metadata")
+def categories_metadata() -> list[dict]:
+    return get_service().categories_metadata()
+
+
+@router.get("/system/cache")
+def system_cache() -> dict:
+    return get_service().cache_stats()
+
 
 
 @router.post("/inspect", response_model=InspectionReport)

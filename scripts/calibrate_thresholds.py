@@ -85,6 +85,7 @@ def pick_threshold(s: np.ndarray, y: np.ndarray) -> float:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--category", default=None, help="Calibrate a specific category only")
     ap.add_argument("--raw-root", default="data/raw/mvtec_ad")
     ap.add_argument("--index-dir", default=None)
     args = ap.parse_args()
@@ -94,26 +95,47 @@ def main() -> None:
     index_dir = Path(args.index_dir) if args.index_dir else s.index_dir
     vdir = index_dir / "vision"
 
-    report: dict = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "method": "seeded_calibration_split_then_held_out_evaluation",
-        "calibration_seed": CALIBRATION_SEED,
-        "n_seeds": N_SEEDS,
-        "limitations": [
-            "Evaluation subsets are small (bottle: 10 good / 32 defect held-out; "
-            "metal_nut: 11 good / 47 defect; cable: 29 good / 46 defect), so per-split "
-            "metric variances are high; the 50-seed sweep quantifies this rather than "
-            "reporting single-split numbers as exact.",
-            "Cable retains substantial good/defect score overlap (image AUROC ~0.84), so "
-            "no threshold can fully resolve it; calibration reduces false-positive "
-            "flooding but does not solve that overlap.",
-        ],
-        "categories": {},
-    }
+    out = s.runs_dir / "calibration.json"
+    if out.exists():
+        try:
+            report = json.loads(out.read_text(encoding="utf-8"))
+        except Exception:
+            report = {}
+    else:
+        report = {}
 
-    for cat in sorted(p.name for p in vdir.iterdir() if (p / "padim.pkl").exists()):
+    if not report.get("method"):
+        report.update({
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "method": "seeded_calibration_split_then_held_out_evaluation",
+            "calibration_seed": CALIBRATION_SEED,
+            "n_seeds": N_SEEDS,
+            "limitations": [
+                "Evaluation subsets are small (bottle: 10 good / 32 defect held-out; "
+                "metal_nut: 11 good / 47 defect; cable: 29 good / 46 defect), so per-split "
+                "metric variances are high; the 50-seed sweep quantifies this rather than "
+                "reporting single-split numbers as exact.",
+                "Cable retains substantial good/defect score overlap (image AUROC ~0.84), so "
+                "no threshold can fully resolve it; calibration reduces false-positive "
+                "flooding but does not solve that overlap.",
+            ],
+            "categories": {},
+        })
+
+    if "categories" not in report:
+        report["categories"] = {}
+
+    target_cats = [args.category] if args.category else sorted(
+        p.name for p in vdir.iterdir() if (p / "padim.pkl").exists()
+    )
+
+    for cat in target_cats:
         t0 = time.time()
-        model = PaDiM.load(vdir / cat / "padim.pkl", device=s.resolved_device())
+        model_p = vdir / cat / "padim.pkl"
+        if not model_p.exists():
+            print(f"Skipping {cat}: no fitted padim.pkl")
+            continue
+        model = PaDiM.load(model_p, device=s.resolved_device())
         rows = collect_rows(model, raw_root / cat / "test")
         cal, ev = split_stratified(rows, CALIBRATION_SEED, SPLIT_FRACTION)
 

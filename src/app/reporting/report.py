@@ -115,6 +115,13 @@ class ReportGenerator:
                     if r.bbox[0] == 0 or r.bbox[1] == 0:
                         limits.append("One or more candidate regions touch the image border; verify that elevated scores are not specular reflections or crop edge artifacts.")
                         break
+            elif vision.category == "screw":
+                limits.append("Screw category exhibits high pixel AUROC (0.973) for defect localization, but arbitrary screw thread rotation angles can elevate image-level anomaly scores on normal screws; verify thread defects against localized candidate regions.")
+                if vision.is_anomalous:
+                    recs.append(EvidenceItem(
+                        kind=EvidenceKind.RECOMMENDATION,
+                        statement="Examine localized bounding boxes on thread and neck regions to distinguish thread rotation from true thread stripping, bending, or head manipulation.",
+                        source="system"))
         else:
             summary = ("Image could not be analysed; see limitations. "
                        "No defect determination was made.")

@@ -21,7 +21,15 @@
 
 ---
 
-### 2. Hugging Face Hub Online Check Latency in Sandboxed/Isolated Environments
+### 3. `screw` Category Thread Rotation Score Variance (Domain Characteristic)
+- **Component:** `src/app/vision/model.py` / `screw` PaDiM model
+- **Description:** On the MVTec AD screw test set, the model achieves a pixel-level AUROC of **0.9726**, confirming defect region localization (identifying manipulated fronts, damaged threads, and head scratches). However, image-level AUROC is **0.6280** with a high false positive rate (48.8% on normal screws at calibrated threshold 24.1733).
+- **Root Cause:** Normal screws in MVTec AD are photographed at unconstrained rotational angles. Because screw threads are helical, rotation changes the spatial coordinates of thread crests and valleys relative to the fixed patch grid, elevating Mahalanobis patch distances on normal rotated screws.
+- **Mitigation:** The system alerts operators: `"Screw category exhibits high pixel AUROC (0.973) for defect localization, but arbitrary screw thread rotation angles can elevate image-level anomaly scores on normal screws; verify thread defects against localized candidate regions."` Operators are instructed to evaluate candidate contour regions on the thread rather than relying solely on image-level thresholds.
+
+---
+
+### 4. Hugging Face Hub Online Check Latency in Sandboxed/Isolated Environments
 - **Component:** `src/app/retrieval/retriever.py`
 - **Description:** Initializing `SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')` defaults to checking Hugging Face Hub online for new commit revisions. In network-isolated or strictly sandboxed runtimes, HTTP socket connection attempts may wait for socket timeouts before falling back to local cached snapshots.
 - **Impact:** Initial retriever initialization or unit test discovery can experience startup latency (~30-60s) unless `HF_HUB_OFFLINE=1` or `local_files_only=True` is enforced.
@@ -29,7 +37,7 @@
 
 ---
 
-### 3. LLM API Outage / Provider Failures (Handled by Fallback)
+### 5. LLM API Outage / Provider Failures (Handled by Fallback)
 - **Component:** `src/app/reporting/report.py`
 - **Description:** Historical coding sessions recorded external API provider errors when invoking remote LLM endpoints.
 - **Impact:** When external LLM APIs fail or when API keys are absent, non-deterministic report rewriting cannot complete.
@@ -37,7 +45,7 @@
 
 ---
 
-### 4. Report Generation Data-Contract Mismatch (Resolved)
+### 6. Report Generation Data-Contract Mismatch (Resolved)
 - **Component:** `src/app/agent/tools.py` (`_t_report`) & `src/app/reporting/report.py` (`generate()`, `_deterministic()`)
 - **Description:** When the inspection agent deliberated and executed `generate_inspection_report`, it serialized the retrieval result as a dict (`retrieval.model_dump() if retrieval else None`). The tool implementation `_t_report` forwarded this dictionary directly to `report_fn` without deserializing. When `_deterministic()` attempted `if retrieval and not retrieval.chunks:`, it failed with:
   `AttributeError: 'dict' object has no attribute 'chunks'`.
@@ -49,15 +57,15 @@
 
 ---
 
-### 5. Git Large File Storage (LFS) for PaDiM Pickles
+### 7. Git Large File Storage (LFS) for PaDiM Pickles
 - **Component:** `data/index/vision/{category}/padim.pkl`
-- **Description:** Each fitted PaDiM model file is approximately 662 MB (combined total ~1.98 GB across bottle, cable, and metal_nut).
+- **Description:** Each fitted PaDiM model file is approximately 662 MB (combined total ~2.65 GB across bottle, cable, metal_nut, and screw).
 - **Impact:** Exceeds standard Git 100 MB single-file push limits on platforms like GitHub.
 - **Status:** Models are locally preserved. Any remote repository sync will require Git LFS tracking or an external model artifact registry (e.g., S3, Hugging Face Hub, or GCS release asset).
 
 ---
 
-### 6. Windows PowerShell Syntax Sensitivity
+### 8. Windows PowerShell Syntax Sensitivity
 - **Component:** Terminal tooling
 - **Description:** Using Linux/POSIX command chaining syntax (e.g. `&&`) in standard Windows PowerShell triggers parser errors (`The token '&&' is not a valid statement separator in this version`).
 - **Mitigation:** Use PowerShell statement separator `;` or run individual commands.

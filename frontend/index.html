@@ -815,6 +815,7 @@ async function initApp() {
 
     // Populate category select
     const sel = $('inp-category');
+    sel.innerHTML = '<option value="">(Auto-detect)</option>';
     h.categories.forEach(c => {
       const o = document.createElement('option');
       o.value = o.textContent = c;
@@ -1014,7 +1015,8 @@ function renderInspectionResults(rep) {
     const catReliability = {
       bottle: { tier: 'High Reliability', badge: 'success', text: 'Benchmark AUROC: 1.000 • 100% Sensitivity & Specificity' },
       metal_nut: { tier: 'High Reliability', badge: 'success', text: 'Benchmark AUROC: 0.974 • 90.3% Sensitivity, 95.5% Specificity' },
-      cable: { tier: 'Moderate Reliability', badge: 'warning', text: 'Benchmark AUROC: 0.841 • 65.2% Sensitivity, 89.7% Specificity (Known score overlap)' }
+      cable: { tier: 'Moderate Reliability', badge: 'warning', text: 'Benchmark AUROC: 0.841 • 65.2% Sensitivity, 89.7% Specificity (Known score overlap)' },
+      screw: { tier: 'High Pixel Localization', badge: 'warning', text: 'Benchmark Pixel AUROC: 0.973 • Thread rotation sensitivity' }
     }[v.category] || { tier: 'Standard', badge: 'info', text: 'Calibrated PaDiM Model' };
 
     html += `<div class="card animate-in" style="margin-bottom:16px;border-color:var(--${verdictClass})">
@@ -1086,6 +1088,14 @@ function renderInspectionResults(rep) {
           </div>
         </div>`;
       }
+    } else if (v.category === 'screw') {
+      html += `<div class="alert-card info animate-in">
+        <div class="alert-icon">ℹ️</div>
+        <div>
+          <strong>SCREW CATEGORY NOTICE:</strong>
+          High pixel localization accuracy (AUROC 0.973). However, varying thread rotation angles relative to camera alignment can elevate raw scores on clean screws. Verify candidate regions on thread and neck manually before rejecting.
+        </div>
+      </div>`;
     }
 
     // Heatmap

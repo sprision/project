@@ -17,16 +17,34 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (48 / 48 Passed)**
+- [x] **Unit Test Suite Verification (56 / 56 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
-  - `tests/unit/test_report.py`: 8 passed (0.58s) [Added tests for borderline score recommendations and category limitation reporting]
+  - `tests/unit/test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
+  - `tests/unit/test_report.py`: 8 passed (regression tests for dict retrieval, borderline score warnings, category limitations)
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
-  - `tests/unit/test_threshold_calibration.py`: 10 passed (15.58s) [Added tests for disjoint stratified split partitioning and seeded reproducibility]
+  - `tests/unit/test_threshold_calibration.py`: 10 passed (15.58s) (calibration threshold presence, metric arithmetic, disjoint split partitioning, seeded reproducibility)
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
-  - `tests/unit/test_agent.py`: 10 passed (32.76s) [Added regression test for tool report assembly]
-  - Total: **48 passing tests** across 8 unit test suites.
+  - `tests/unit/test_agent.py`: 10 passed (32.76s) (regression test for tool report assembly)
+  - Total: **56 passing tests** across 9 unit test suites.
+
+- [x] **Phase 1: Scalable Model Registry & LRU Cache Implementation**
+  - Implemented `src/app/vision/registry.py` with `ModelRegistry`, `LRUModelCache` (capacity = 3), and `CategoryMetadata`.
+  - Added thread-safe model eviction and automatic GPU/RAM cleanup (`gc.collect()`, `torch.cuda.empty_cache()`).
+  - Added RAM working set and CUDA VRAM tracking (`get_process_memory_mb()`).
+  - Updated `InspectionService` and `routes.py` (`/categories`, `/categories/metadata`, `/system/cache`).
+  - Verified dynamic frontend dropdown population without duplicate appending.
+
+- [x] **Phase 2: MVTec AD `screw` Category Integration**
+  - Downloaded `screw` dataset (320 train normal, 160 test: 41 good, 119 defective) from Hugging Face mirror.
+  - Fitted PaDiM model on 320 train images in 103.5s on CUDA (normalization: [11.30, 15.49], saved to `data/index/vision/screw/padim.pkl`, 662 MB).
+  - Calibrated raw decision threshold in 19.7s on CUDA (`threshold_raw` = 24.1733, balanced acc = 0.7333 calib / 0.5076 eval).
+  - Evaluated computer vision benchmark in 17.3s on CUDA: Image AUROC = 0.6280, Pixel AUROC = 0.9726.
+  - Generated full validation report across all 160 test images (TP=86, FP=20, TN=21, FN=33, balanced acc = 0.6174).
+  - Measured empirical memory and verified LRU eviction: 4th model load (`screw`) evicted oldest model (`bottle`), bounding active RAM at ~2.68 GB and CUDA VRAM at ~131 MB.
+  - Added category limitation and inspection guidance in `report.py` and `frontend/index.html`.
+  - Verified live end-to-end inspection on sample `screw/test/manipulated_front/000.png`.
 
 - [x] **Calibration Integrity & Authority Boundary Review**
   - Confirmed calibration split methodology (`split_stratified` 50/50 disjoint split with seed 42) ensures 0% test leakage.

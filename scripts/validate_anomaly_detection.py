@@ -203,12 +203,39 @@ def print_summary(results: dict):
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--category", default=None)
+    ap.add_argument("--all", action="store_true")
+    args = ap.parse_args()
+
+    s = get_settings()
     raw_root = Path("data/raw/mvtec_ad")
-    categories = ["bottle", "cable", "metal_nut"]
+    vdir = s.index_dir / "vision"
+
+    if args.category:
+        categories = [args.category]
+    else:
+        categories = sorted(p.name for p in vdir.iterdir() if (p / "padim.pkl").exists())
+
     res = run_validation(raw_root, categories)
     print_summary(res)
 
     out_file = Path("runs/validation_results.json")
+    if out_file.exists():
+        try:
+            existing = json.loads(out_file.read_text(encoding="utf-8"))
+            existing["timestamp"] = res["timestamp"]
+            existing["device"] = res["device"]
+            if "categories" not in existing:
+                existing["categories"] = {}
+            for c, cdata in res["categories"].items():
+                existing["categories"][c] = cdata
+            res = existing
+        except Exception:
+            pass
+
     out_file.write_text(json.dumps(res, indent=2), encoding="utf-8")
-    print(f"\nSaved full validation records to {out_file}")
+    print(f"\nSaved validation records to {out_file}")
+
 

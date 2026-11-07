@@ -83,7 +83,7 @@ def test_fallback_normalised_verdict(tmp_path):
 def test_calibrated_threshold_files_exist_and_positive():
     """Verify that all production categories have calibrated raw thresholds."""
     vdir = Path("data/index/vision")
-    for cat in ["bottle", "cable", "metal_nut"]:
+    for cat in ["bottle", "cable", "metal_nut", "screw"]:
         tpath = vdir / cat / "threshold.json"
         assert tpath.exists(), f"threshold.json missing for {cat}"
         data = json.loads(tpath.read_text(encoding="utf-8"))
