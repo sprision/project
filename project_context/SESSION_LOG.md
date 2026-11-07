@@ -130,3 +130,32 @@
   - `scripts/validate_anomaly_detection.py` (Validation script).
   - `runs/validation_results.json` (Full 348-image record without touching `runs/eval_cv.json` or `runs/calibration.json`).
 - **Preservation Check:** All existing PaDiM pickle weights in `data/index/vision/` and benchmark runs in `runs/` preserved unmodified.
+
+---
+
+### Session 5: Calibration Integrity Review & Decision-Support Dashboard Hardening
+- **Date & Local Time:** 2026-11-07T13:52:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:** Verify calibration integrity, dataset disjointness, error distributions, and enhance the dashboard and report generator with decision-support authority boundaries, non-probabilistic score framing, and borderline human-review recommendations.
+- **Verification Findings:**
+  1. **Calibration Separation Integrity:** In `scripts/calibrate_thresholds.py`, `split_stratified` partitions the test set into disjoint halves (seed 42). The threshold `threshold_raw` was selected solely on the calibration subset (`cal`) maximizing balanced accuracy. The held-out evaluation subset was untouched during threshold picking.
+  2. **50-Seed Monte Carlo Stability:** Confirmed that across 50 random splits, metric variability is quantified (bottle mean bal-acc: 0.9751, metal nut: 0.9109, cable: 0.7373). Seeded reproducibility was verified with unit tests.
+  3. **Defect Analysis of Errors:**
+     - 7 False Positives: 1 on `metal_nut/good/006.png` caused by an edge reflection at `y=0`; 6 on `cable/good/` caused by normal cable curvature/twist shadows scoring 31.42–35.80 vs threshold 30.42.
+     - 41 False Negatives: Cable defects with low patch activation (`poke_insulation` 10/10 missed, `missing_wire` 9/10 missed) blend into normal background feature distributions; Metal nut defects (4 scratches, 5 bends) lying near the margin of threshold 23.17.
+- **Code & UI Enhancements:**
+  1. **Dashboard UI (`frontend/index.html`):**
+     - Added persistent decision-support notice banner at the top of content.
+     - Framed anomaly scores explicitly as unnormalized spatial Mahalanobis distances and threshold margins (not probabilities).
+     - Added category benchmark reliability indicators (`bottle` high, `metal_nut` high, `cable` moderate).
+     - Added automated borderline score alert card ($|raw - threshold| < 3.0$) mandating secondary human visual review.
+     - Added category limitation cards for cable geometry overlap and metal nut boundary edge reflections.
+     - Added authority boundary notice in the full report viewer.
+  2. **Reporting Layer (`src/app/reporting/report.py`):**
+     - Automatically generates borderline score recommendations and limitations when raw score is within 3.0 points of threshold.
+     - Automatically includes cable category score overlap caveats and metal nut boundary reflection notices.
+  3. **Unit Tests:**
+     - Added `test_calibration_split_stratified_disjoint_and_reproducible` and `test_pick_threshold_maximizes_balanced_accuracy` in `tests/unit/test_threshold_calibration.py`.
+     - Added `test_borderline_score_generates_human_review_recommendation` in `tests/unit/test_report.py`.
+     - All **48 unit tests passing** across 8 test suites.
+- **Preservation Check:** All existing models (`data/index/vision/`) and evaluation benchmarks (`runs/`) remain intact.

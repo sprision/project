@@ -109,3 +109,43 @@ def test_metrics_calculation_known_values():
     assert m["false_positive_rate"] == pytest.approx(2 / 6)
     assert m["balanced_accuracy"] == pytest.approx(0.5 * (3 / 4 + 4 / 6))
 
+
+def test_calibration_split_stratified_disjoint_and_reproducible():
+    """Verify that calibration and evaluation splits are disjoint and seeded reproducibility holds."""
+    from scripts.calibrate_thresholds import split_stratified
+    # Create 20 unique labeled rows
+    rows = [(True, float(i)) for i in range(10)] + [(False, float(i + 100)) for i in range(10)]
+    cal1, ev1 = split_stratified(rows, seed=42, frac=0.5)
+    cal2, ev2 = split_stratified(rows, seed=42, frac=0.5)
+
+    # Disjointness
+    assert len(cal1) + len(ev1) == len(rows)
+    assert set(cal1).isdisjoint(set(ev1)), "Calibration and evaluation splits must be disjoint!"
+
+    # Stratification: equal proportion of good and defect
+    assert sum(1 for g, _ in cal1 if g) == 5
+    assert sum(1 for g, _ in cal1 if not g) == 5
+    assert sum(1 for g, _ in ev1 if g) == 5
+    assert sum(1 for g, _ in ev1 if not g) == 5
+
+    # Reproducibility under same seed
+    assert cal1 == cal2
+    assert ev1 == ev2
+
+    # Different seeds yield different permutations
+    cal3, _ = split_stratified(rows, seed=999, frac=0.5)
+    assert cal1 != cal3
+
+
+def test_pick_threshold_maximizes_balanced_accuracy():
+    """Verify that pick_threshold selects a cut-off maximizing balanced accuracy."""
+    from scripts.calibrate_thresholds import pick_threshold, metrics
+    # Scores for good (0): 10, 12, 14, 16. Scores for defect (1): 18, 20, 22, 24.
+    s = np.array([10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0])
+    y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    t = pick_threshold(s, y)
+    assert 16.0 < t < 18.0, f"Expected threshold separating good and defect, got {t}"
+    m = metrics(y, (s >= t).astype(int))
+    assert m["balanced_accuracy"] == 1.0
+
+

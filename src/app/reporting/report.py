@@ -90,6 +90,31 @@ class ReportGenerator:
                     statement="Continue routine monitoring; re-inspect on the "
                               "normal schedule or if operating conditions "
                               "change.", source="system"))
+
+            # Check for borderline threshold proximity
+            if vision.verdict_mode == "calibrated_raw" and vision.threshold:
+                margin = abs(vision.raw_anomaly_score - vision.threshold)
+                if margin < 3.0:
+                    recs.append(EvidenceItem(
+                        kind=EvidenceKind.RECOMMENDATION,
+                        statement=f"Borderline score margin ({margin:.2f} points from threshold {vision.threshold:.2f}); "
+                                  "sample lies near the decision boundary. Secondary visual verification by an inspector is advised.",
+                        source="system"))
+                    limits.append(f"Borderline score proximity: raw score is within {margin:.2f} points of decision threshold.")
+
+            # Category-specific guidance & known limitations
+            if vision.category == "cable":
+                limits.append("Cable category exhibits documented score overlap between twisted normal samples and subtle defects; fine internal wire defects and pinprick insulation pokes require physical verification.")
+                if vision.is_anomalous:
+                    recs.append(EvidenceItem(
+                        kind=EvidenceKind.RECOMMENDATION,
+                        statement="Verify wire bundle curvature and sheath alignment manually to rule out false positive from natural cable flexure.",
+                        source="system"))
+            elif vision.category == "metal_nut":
+                for r in vision.regions:
+                    if r.bbox[0] == 0 or r.bbox[1] == 0:
+                        limits.append("One or more candidate regions touch the image border; verify that elevated scores are not specular reflections or crop edge artifacts.")
+                        break
         else:
             summary = ("Image could not be analysed; see limitations. "
                        "No defect determination was made.")

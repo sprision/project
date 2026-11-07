@@ -87,3 +87,17 @@ def test_regression_retrieval_as_dict_empty_chunks(tmp_workspace):
     rep = g.generate("x", "defect?", _vision(True, 0.9), retrieval_dict, [], [])
     assert rep is not None
     assert any("No supporting passages were retrieved" in lim for lim in rep.limitations)
+
+
+def test_borderline_score_generates_human_review_recommendation(tmp_workspace):
+    """Verify that scores close to the calibrated threshold trigger a borderline warning."""
+    v = VisionResult(
+        image_id="borderline_sample", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.55, raw_anomaly_score=31.0,
+        is_anomalous=True, threshold=30.42, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    rep = ReportGenerator().generate("borderline_sample", "defect?", v, None, [], [])
+    assert any("Borderline score" in r.statement for r in rep.recommendations)
+    assert any("Borderline score proximity" in lim for lim in rep.limitations)
+    assert any("Cable category exhibits documented score overlap" in lim for lim in rep.limitations)
+

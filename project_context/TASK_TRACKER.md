@@ -17,16 +17,26 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
-- [x] **Unit Test Suite Verification (45 / 45 Passed)**
+- [x] **Unit Test Suite Verification (48 / 48 Passed)**
   - `tests/unit/test_schemas.py`: 4 passed (0.31s)
   - `tests/unit/test_db.py`: 2 passed (0.72s)
   - `tests/unit/test_ingest.py`: 5 passed (1.23s)
-  - `tests/unit/test_report.py`: 7 passed (0.70s) [Added 2 regression tests for dict-serialized retrieval]
+  - `tests/unit/test_report.py`: 8 passed (0.58s) [Added tests for borderline score recommendations and category limitation reporting]
   - `tests/unit/test_vision_validation.py`: 5 passed (14.45s)
-  - `tests/unit/test_threshold_calibration.py`: 8 passed (15.55s) [Added 2 tests for calibration threshold loading and metric arithmetic]
+  - `tests/unit/test_threshold_calibration.py`: 10 passed (15.58s) [Added tests for disjoint stratified split partitioning and seeded reproducibility]
   - `tests/unit/test_retriever.py`: 4 passed (38.71s)
-  - `tests/unit/test_agent.py`: 10 passed (32.76s) [Added 1 regression test for tool report assembly]
-  - Total: **45 passing tests** across 8 unit test suites.
+  - `tests/unit/test_agent.py`: 10 passed (32.76s) [Added regression test for tool report assembly]
+  - Total: **48 passing tests** across 8 unit test suites.
+
+- [x] **Calibration Integrity & Authority Boundary Review**
+  - Confirmed calibration split methodology (`split_stratified` 50/50 disjoint split with seed 42) ensures 0% test leakage.
+  - Verified 50-seed Monte Carlo stability cross-validation reproducibility.
+  - Inspected all 7 false positives (6 cable twist/bend variants, 1 metal nut crop-boundary reflection) and 41 false negatives (cable low-activation defects: `poke_insulation` 10/10, `missing_wire` 9/10; metal nut margin defects).
+  - Enhanced dashboard and report generator:
+    - Non-probabilistic score framing (explicit Mahalanobis distance & threshold margin).
+    - Category-specific benchmark reliability tiers.
+    - Automated borderline score alert ($|raw - threshold| < 3.0$) with human-review requirement.
+    - Persistent authority boundary banner ("Decision-support system, not autonomous quality authority").
 
 - [x] **Anomaly Detection Reliability Validation (Complete 348 MVTec AD Samples)**
   - Evaluated all known-good and known-defective images for `bottle` (83), `cable` (150), and `metal_nut` (115) with calibrated thresholds.

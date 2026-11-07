@@ -70,3 +70,13 @@
   - Every single finding item is explicitly typed (`visual_observation`, `retrieved_fact`, `inspection_history`, `hypothesis`, `recommendation`, `limitation`) with source attribution and confidence.
   - Mandatory disclaimer is hardcoded into every report schema: "Decision support only. Not an authorisation to operate, repair or shut down equipment."
 
+---
+
+### 8. Non-Probabilistic Score Presentation & Authority Boundaries in UI
+- **Decision:** Present anomaly scores strictly as unnormalized spatial Mahalanobis distance metrics with distance margins relative to calibrated cut-offs, rather than converting them into pseudo-probabilities (percentages). Enforce persistent authority boundary notices across UI and report artifacts.
+- **Rationale:**
+  - Mahalanobis distances under Gaussian assumptions on patch feature activations do not represent calibrated posterior defect probabilities $P(\text{defect} \mid x)$. Presenting a score of e.g. "0.85" or "85%" deceives operators into perceiving statistical certainty.
+  - Category-specific physical variances (e.g., twisted normal cables or crop-boundary specular glints on metal nuts) produce high distances without true physical failure.
+  - Adding an explicit "Borderline Score" alert when $|raw - threshold| < 3.0$ and persistent "Decision Support Notice: Not an autonomous quality-control authority" establishes unambiguous operational accountability.
+
+

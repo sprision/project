@@ -94,17 +94,23 @@
 ### 8. Frontend Dashboard
 - **Status:** Complete & Verified (`frontend/index.html`).
 - **Features:** Dark industrial UI with overview dashboard, image upload, PaDiM inference trigger, heatmap viewing, defect region details, KB search, document ingestion, inspection history table, report viewer, and JSON download. Dynamically loads CV evaluation and calibration metrics from `/api/eval/`.
+- **Decision-Support Enhancements:**
+  - Persistent global authority notice banner establishing decision-support boundaries (not an autonomous quality authority).
+  - Explicit non-probabilistic score presentation: raw Mahalanobis distances and threshold margins clearly explained.
+  - Category benchmark reliability pills (`bottle`: high, `metal_nut`: high, `cable`: moderate with documented overlap).
+  - Automated borderline score warning cards ($|raw - threshold| < 3.0$) mandating secondary human visual review.
+  - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 45 / 45 passing unit tests across all 8 suites:
+- **Status:** 48 / 48 passing unit tests across all 8 suites:
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
-  - `test_report.py`: 7 passed (includes 2 regression tests for dict retrieval)
+  - `test_report.py`: 8 passed (includes regression tests for dict retrieval, borderline score warnings, and category limitations)
   - `test_vision_validation.py`: 5 passed
-  - `test_threshold_calibration.py`: 8 passed (includes 2 tests for calibration threshold presence and metric arithmetic)
+  - `test_threshold_calibration.py`: 10 passed (includes tests for calibration threshold presence, metric arithmetic, disjoint split partitioning, and seeded reproducibility)
   - `test_retriever.py`: 4 passed
-  - `test_agent.py`: 10 passed (includes 1 regression test for agent report generation tool with dict retrieval)
+  - `test_agent.py`: 10 passed (includes regression test for agent report generation tool with dict retrieval)
 
 ### 10. Deployment Strategy
 - **Status:** Complete.

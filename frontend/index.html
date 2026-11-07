@@ -416,6 +416,42 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius-sm); font-size: 12px; margin: 4px;
 }
 .region-pill .region-score { font-family: var(--mono); font-weight: 600; }
+
+/* System Decision-Support Banner */
+.system-disclaimer-banner {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: rgba(26, 35, 50, 0.85); border: 1px solid rgba(59, 130, 246, 0.35);
+  border-left: 4px solid var(--accent); border-radius: var(--radius-sm);
+  padding: 12px 18px; margin-bottom: 20px; font-size: 12px; line-height: 1.55;
+  color: var(--text-secondary); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.system-disclaimer-banner .banner-icon { font-size: 20px; flex-shrink: 0; line-height: 1; margin-top: 1px; }
+.system-disclaimer-banner strong { color: var(--text-primary); font-weight: 600; letter-spacing: 0.3px; }
+.system-disclaimer-banner u { text-decoration-color: var(--accent); }
+
+/* Borderline and Category Limitation Cards */
+.alert-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border-radius: var(--radius-sm); margin-bottom: 14px;
+  font-size: 12px; line-height: 1.5; border: 1px solid transparent;
+}
+.alert-card.warning {
+  background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+.alert-card.warning strong { color: #fde68a; }
+.alert-card.info {
+  background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+.alert-card.info strong { color: #dbeafe; }
+.alert-card .alert-icon { font-size: 18px; flex-shrink: 0; }
+
+.reliability-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  background: var(--bg-card); border: 1px solid var(--border);
+}
 </style>
 </head>
 <body>
@@ -482,6 +518,15 @@ a:hover { text-decoration: underline; }
     </header>
 
     <div class="content">
+
+      <!-- Global Decision Support Authority Notice -->
+      <div class="system-disclaimer-banner animate-in">
+        <div class="banner-icon">🛡️</div>
+        <div class="banner-content">
+          <strong>INDUSTRIAL DECISION SUPPORT SYSTEM:</strong>
+          InspectAI provides automated spatial anomaly localization (Mahalanobis feature distance) and technical evidence retrieval. Anomaly scores are relative distance metrics, <u>not</u> defect probabilities. This system is <u>not</u> an autonomous quality-control authority; all verdicts and recommendations require visual verification by qualified inspection personnel.
+        </div>
+      </div>
 
       <!-- ========== PAGE: OVERVIEW ========== -->
       <div class="page active" id="page-overview">
@@ -959,40 +1004,100 @@ function renderInspectionResults(rep) {
   if (v) {
     const isAnom = v.is_anomalous;
     const verdictClass = isAnom ? 'danger' : 'success';
-    const verdictText = isAnom ? 'ANOMALY DETECTED' : 'NORMAL';
+    const verdictText = isAnom ? 'POTENTIAL ANOMALY DETECTED' : 'NORMAL (WITHIN CALIBRATED LIMITS)';
     const verdictIcon = isAnom ? '⚠️' : '✅';
+    const delta = v.raw_anomaly_score - v.threshold;
+    const margin = Math.abs(delta);
+    const isBorderline = (v.verdict_mode === 'calibrated_raw' && margin < 3.0);
+
+    // Reliability metadata by category
+    const catReliability = {
+      bottle: { tier: 'High Reliability', badge: 'success', text: 'Benchmark AUROC: 1.000 • 100% Sensitivity & Specificity' },
+      metal_nut: { tier: 'High Reliability', badge: 'success', text: 'Benchmark AUROC: 0.974 • 90.3% Sensitivity, 95.5% Specificity' },
+      cable: { tier: 'Moderate Reliability', badge: 'warning', text: 'Benchmark AUROC: 0.841 • 65.2% Sensitivity, 89.7% Specificity (Known score overlap)' }
+    }[v.category] || { tier: 'Standard', badge: 'info', text: 'Calibrated PaDiM Model' };
 
     html += `<div class="card animate-in" style="margin-bottom:16px;border-color:var(--${verdictClass})">
-      <div style="text-align:center;padding:12px 0">
-        <div style="font-size:28px;margin-bottom:6px">${verdictIcon}</div>
-        <div class="badge badge-${isAnom?'anomalous':'normal'}" style="font-size:14px;padding:6px 20px">${verdictText}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-subtle)">
+        <span class="reliability-pill">
+          <span class="status-dot ${catReliability.badge === 'success' ? 'online' : 'offline'}"></span>
+          <span>Category: <strong style="color:var(--text-primary)">${v.category}</strong> (${catReliability.tier})</span>
+        </span>
+        <span style="font-size:11px;color:var(--text-dim);font-family:var(--mono)">${catReliability.text}</span>
       </div>
+
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:32px;margin-bottom:6px">${verdictIcon}</div>
+        <div class="badge badge-${isAnom?'anomalous':'normal'}" style="font-size:13px;padding:6px 20px;letter-spacing:0.5px">${verdictText}</div>
+      </div>
+
       <div class="grid-3" style="margin-top:16px;gap:12px">
-        <div style="text-align:center">
-          <div class="stat-label">Anomaly Score</div>
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:${isAnom?'var(--danger)':'var(--success)'}">${v.image_anomaly_score.toFixed(4)}</div>
+        <div style="text-align:center;background:var(--bg-input);padding:10px;border-radius:var(--radius-sm)">
+          <div class="stat-label">Raw Score (Mahalanobis)</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:${isAnom?'var(--danger)':'var(--success)'}">${v.raw_anomaly_score.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">Unnormalized feature distance</div>
         </div>
-        <div style="text-align:center">
-          <div class="stat-label">Raw Score</div>
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono)">${v.raw_anomaly_score.toFixed(2)}</div>
+        <div style="text-align:center;background:var(--bg-input);padding:10px;border-radius:var(--radius-sm)">
+          <div class="stat-label">Calibrated Threshold</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--text-muted)">${v.threshold.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">Seeded calibration cut-off</div>
         </div>
-        <div style="text-align:center">
-          <div class="stat-label">Threshold</div>
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--text-muted)">${v.threshold.toFixed(2)}</div>
+        <div style="text-align:center;background:var(--bg-input);padding:10px;border-radius:var(--radius-sm)">
+          <div class="stat-label">Score Margin</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono);color:${isAnom?'var(--danger)':'var(--text-secondary)'}">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${delta >= 0 ? 'Above decision threshold' : 'Below decision threshold'}</div>
         </div>
       </div>
-      <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--text-dim)">
-        Mode: ${v.verdict_mode} • Model: ${v.model_name} (${v.backbone}) • ${v.inference_ms||0}ms inference
+
+      <div style="margin-top:12px;padding:8px 12px;background:var(--bg-input);border-radius:var(--radius-sm);font-size:11px;color:var(--text-dim);text-align:center">
+        ℹ️ Scores are relative Mahalanobis distances from normal training patches, <strong>not probabilities</strong>. Mode: ${v.verdict_mode} • Model: ${v.model_name} (${v.backbone}) • ${v.inference_ms||0}ms
       </div>
     </div>`;
+
+    // Borderline Human Review Alert
+    if (isBorderline) {
+      html += `<div class="alert-card warning animate-in">
+        <div class="alert-icon">⚠️</div>
+        <div>
+          <strong>BORDERLINE SCORE (Near Decision Threshold):</strong>
+          The raw anomaly score is within ${margin.toFixed(2)} points of the calibrated threshold (${v.threshold.toFixed(2)}).
+          Because this sample lies close to the classification boundary, <strong>secondary human visual verification is strongly recommended</strong> before making an operational decision.
+        </div>
+      </div>`;
+    }
+
+    // Category-specific limitation warnings
+    if (v.category === 'cable') {
+      html += `<div class="alert-card info animate-in">
+        <div class="alert-icon">ℹ️</div>
+        <div>
+          <strong>CABLE CATEGORY LIMITATION:</strong>
+          PaDiM exhibits known score overlap on cables (benchmark AUROC 0.841). Coarse defects (outer insulation cuts, bent wires) are reliably detected, but subtle defects (such as missing internal wires or minute insulation pinpricks) produce lower activation. Additionally, natural cable curvature can elevate scores on normal cables. Manual inspection is advised.
+        </div>
+      </div>`;
+    } else if (v.category === 'metal_nut') {
+      const touchesBorder = v.regions && v.regions.some(r => r.bbox[0] === 0 || r.bbox[1] === 0);
+      if (touchesBorder) {
+        html += `<div class="alert-card info animate-in">
+          <div class="alert-icon">ℹ️</div>
+          <div>
+            <strong>BOUNDARY EDGE ARTIFACT NOTICE:</strong>
+            One or more candidate defect regions touch the frame edge. In metal nut inspections, specular boundary reflections at crop edges can occasionally elevate raw anomaly scores. Inspect the raw image to verify physical surface defect existence.
+          </div>
+        </div>`;
+      }
+    }
 
     // Heatmap
     if (v.heatmap_path) {
       html += `<div class="card animate-in delay-1" style="margin-bottom:16px">
-        <div class="card-header"><div class="card-title"><span class="icon">🔥</span> Anomaly Heatmap</div></div>
+        <div class="card-header"><div class="card-title"><span class="icon">🔥</span> Anomaly Heatmap (JET Overlay)</div></div>
         <div class="image-display">
           <img src="${API}/heatmap/${v.heatmap_path}" alt="Anomaly heatmap" onerror="this.parentElement.innerHTML='<p style=\\'padding:20px;color:var(--text-muted)\\'>Heatmap not available</p>'"/>
           <span class="image-label badge ${isAnom?'badge-anomalous':'badge-normal'}">${verdictText}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px">
+          Heatmap visualization uses min-max stretching for localization only; decision verdicts are strictly computed on raw calibrated patch activations.
         </div>
       </div>`;
     }
@@ -1005,7 +1110,7 @@ function renderInspectionResults(rep) {
         html += `<div class="region-pill">
           <span style="color:var(--accent)">Region ${r.region_id}</span>
           <span style="color:var(--text-muted)">•</span>
-          <span class="region-score" style="color:var(--danger)">${r.score.toFixed(4)}</span>
+          <span class="region-score" style="color:var(--danger)">raw ${r.score.toFixed(2)}</span>
           <span style="color:var(--text-dim)">${(r.area_frac*100).toFixed(2)}% area</span>
           <span style="color:var(--text-dim)">bbox(${r.bbox.join(',')})</span>
         </div>`;
@@ -1139,8 +1244,19 @@ function renderFullReport(rep) {
     </div>
   </div>`;
 
+  // Decision support system warning banner
+  html += `<div class="system-disclaimer-banner" style="margin-bottom:20px">
+    <div class="banner-icon">🛡️</div>
+    <div class="banner-content">
+      <strong>AUTHORITY BOUNDARY NOTICE:</strong> This inspection document was generated by an automated decision-support system to guide maintenance review. It is <u>not</u> an autonomous engineering sign-off, work authorization, or quality-control certification. All visual findings and recommendations must be physically verified by qualified personnel.
+    </div>
+  </div>`;
+
   // Vision results
   if (v) {
+    const delta = v.raw_anomaly_score - v.threshold;
+    const isBorderline = (v.verdict_mode === 'calibrated_raw' && Math.abs(delta) < 3.0);
+
     html += `<div class="report-section"><h4><span>🔬</span> Vision Analysis</h4>`;
     html += `<div class="card" style="margin-bottom:16px">
       <div class="grid-2" style="gap:16px">
@@ -1148,11 +1264,11 @@ function renderFullReport(rep) {
           <table class="data-table">
             <tr><td style="color:var(--text-muted)">Category</td><td style="font-weight:600">${v.category}</td></tr>
             <tr><td style="color:var(--text-muted)">Model</td><td>${v.model_name} (${v.backbone})</td></tr>
-            <tr><td style="color:var(--text-muted)">Verdict</td><td><span class="badge badge-${v.is_anomalous?'anomalous':'normal'}">${v.is_anomalous?'ANOMALOUS':'NORMAL'}</span></td></tr>
-            <tr><td style="color:var(--text-muted)">Anomaly Score</td><td class="mono" style="font-weight:600">${v.image_anomaly_score.toFixed(4)}</td></tr>
-            <tr><td style="color:var(--text-muted)">Raw Score</td><td class="mono">${v.raw_anomaly_score.toFixed(4)}</td></tr>
-            <tr><td style="color:var(--text-muted)">Threshold</td><td class="mono">${v.threshold.toFixed(4)}</td></tr>
-            <tr><td style="color:var(--text-muted)">Verdict Mode</td><td>${v.verdict_mode}</td></tr>
+            <tr><td style="color:var(--text-muted)">Verdict</td><td><span class="badge badge-${v.is_anomalous?'anomalous':'normal'}">${v.is_anomalous?'ANOMALY DETECTED':'NORMAL'}</span></td></tr>
+            <tr><td style="color:var(--text-muted)">Raw Anomaly Score</td><td class="mono" style="font-weight:600;color:${v.is_anomalous?'var(--danger)':'var(--success)'}">${v.raw_anomaly_score.toFixed(4)} <span style="font-size:10px;color:var(--text-dim)">(Mahalanobis)</span></td></tr>
+            <tr><td style="color:var(--text-muted)">Calibrated Threshold</td><td class="mono">${v.threshold.toFixed(4)}</td></tr>
+            <tr><td style="color:var(--text-muted)">Score Margin</td><td class="mono">${delta >= 0 ? '+' : ''}${delta.toFixed(4)}</td></tr>
+            <tr><td style="color:var(--text-muted)">Score Metric</td><td style="font-size:11px;color:var(--text-dim)">Non-probabilistic spatial distance</td></tr>
             <tr><td style="color:var(--text-muted)">Inference Time</td><td>${v.inference_ms||0}ms</td></tr>
             <tr><td style="color:var(--text-muted)">Defect Regions</td><td>${v.regions.length}</td></tr>
           </table>
@@ -1161,6 +1277,10 @@ function renderFullReport(rep) {
           ${v.heatmap_path ? `<div class="image-display"><img src="${API}/heatmap/${v.heatmap_path}" alt="Heatmap"/></div>` : '<p style="color:var(--text-dim)">No heatmap generated</p>'}
         </div>
       </div>
+      ${isBorderline ? `<div class="alert-card warning" style="margin-top:14px">
+        <div class="alert-icon">⚠️</div>
+        <div><strong>Borderline Result:</strong> Raw anomaly score is within 3.0 points of the calibrated threshold. Secondary manual inspection is recommended.</div>
+      </div>` : ''}
     </div></div>`;
   }
 
