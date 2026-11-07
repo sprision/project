@@ -387,6 +387,41 @@
 
 ---
 
+### Session 13: Final Decision Logic & Product Readiness Pass
+- **Date & Local Time:** 2026-11-07T17:45:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Inspect and enforce strict 3-level finding categorization precedence in `src/app/reporting/report.py`: uncertain / human review evaluated first, then candidate defect, then potential anomaly.
+  2. Guarantee pairwise disjoint subsets across all three finding categories with `is_human_confirmed=False` across all algorithmic predictions.
+  3. Author boundary unit tests for margins $-3.0$, $2.99$ (just below 3.0), $3.0$, $4.99$ (just below 5.0), and $5.0$.
+  4. Ensure UI reflects this 3-level hierarchy, prominently highlights mandatory review actions, clearly distinguishes calibration stability from strict held-out metrics, and highlights Naive OR (79.05% BalAcc) vs Consensus (76.42% BalAcc) trade-offs.
+  5. Run complete end-to-end product readiness verification across all 4 categories (`bottle`, `cable`, `metal_nut`, `screw`), LRU caching/eviction, and run the complete unit test suite.
+- **Key Implementation & Verification Results:**
+  1. **Strict 3-Level Precedence in `src/app/reporting/report.py`:**
+     - Precedence 1 (`uncertain_human_review`): Evaluated first. Captures borderline score proximity ($|\Delta| < 3.0$), detector disagreements (specialized detector triggers while base PaDiM is nominal), or documented category ambiguities.
+     - Precedence 2 (`candidate_defects`): Evaluated second. Captures strong indications not flagged as uncertain: high margin ($\Delta \ge 5.0$) OR multi-detector consensus ($\Delta \ge 3.0$).
+     - Precedence 3 (`potential_anomalies`): Evaluated third. Captures moderate single-detector activations ($3.0 \le \Delta < 5.0$).
+     - Hardcoded `is_human_confirmed=False` across all algorithmic outputs. Populated actionable review instructions (`🔍 Action Required: ...` / `⚡ Action Required: ...`).
+  2. **Boundary Unit Testing in `tests/unit/test_report.py`:**
+     - Added `test_finding_categorization_boundary_conditions` covering margins $-3.0$, $2.99$, $3.0$, $4.99$, $5.0$, detector disagreements, and corroborated consensus near boundaries.
+     - Proved pairwise disjoint category sets across all tested outputs ($\text{Uncertain} \cap \text{Candidate} = \emptyset$, $\text{Uncertain} \cap \text{Potential} = \emptyset$, $\text{Candidate} \cap \text{Potential} = \emptyset$).
+     - Unit test count expanded to 14 in `test_report.py`.
+  3. **Frontend Dashboard Polish (`frontend/index.html`):**
+     - Aligned inline inspection results and modal view to strictly reflect the 3-level order: Uncertain first, Candidate Defects second, Potential Anomalies third.
+     - Added dedicated Multi-Detector Cable Benchmark Comparison table clearly identifying ⭐ Naive OR as the best binary balanced-accuracy result on this split (79.05% BalAcc, 89.13% recall) and explaining Consensus & Masked (76.42% BalAcc) operational trade-off (cutting false alarms on clean twisted cables and routing ambiguous spikes to human review).
+     - Clearly distinguished Calibration Pool Stability (50 seeds) from Strict Held-Out Evaluation (untouched evaluation split, zero threshold-selection leakage).
+  4. **Product Readiness Verification (`scratch/verify_product_readiness.py`):**
+     - Step 1: Health, dynamic category listing (`bottle`, `cable`, `metal_nut`, `screw`), metadata, benchmark loading, and hybrid KB query verified.
+     - Step 2: Multi-detector cable inspections on clean cable (nominal, 0 false alarms), missing wire (continuity alert, routed to human review), and puncture (high-margin defect detected, score 54.11) verified.
+     - Step 3: Model caching & category switching across all 4 categories verified. Cache bounded at capacity 3, LRU model eviction verified without memory leaks.
+     - Step 4: SQLite persistence and report retrieval verified.
+     - Step 5: Full JSON download export (14,561 bytes) with disclaimer verified.
+  5. **Unit Test Suite:**
+     - **74 / 74 tests passed in 48.38s** across 11 unit test suites.
+- **Preservation Check:** All existing production models and historical benchmark records strictly preserved. Zero tuning against held-out labels.
+
+---
+
 ### Session 11: Multi-Detector Decision Integrity, Provenance & Reporting System Polish
 - **Date & Local Time:** 2026-11-07T15:55:00+05:30
 - **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
@@ -466,3 +501,38 @@
 - **Unit Test Results:**
   - Full suite verified: **73 / 73 passed in 53.45s**.
 - **Preservation Check:** All existing production models (`data/index/vision/`) and historical benchmark results (`runs/eval_cv.json`, `runs/calibration.json`, `runs/held_out_evaluation.json`, `runs/cable_specialized_evaluation.json`) strictly preserved. Zero leakage or tuning against held-out labels.
+
+---
+
+### Session 13: Final Decision Logic & Product Readiness Pass
+- **Date & Local Time:** 2026-11-07T17:45:00+05:30
+- **Agent:** Antigravity Engineering Assistant (Gemini 3.8 Flash / Pair Programming)
+- **Objective:**
+  1. Inspect and enforce strict 3-level finding categorization precedence in `src/app/reporting/report.py`: uncertain / human review evaluated first, then candidate defect, then potential anomaly.
+  2. Guarantee pairwise disjoint subsets across all three finding categories with `is_human_confirmed=False` across all algorithmic predictions.
+  3. Author boundary unit tests for margins $-3.0$, $2.99$ (just below 3.0), $3.0$, $4.99$ (just below 5.0), and $5.0$.
+  4. Ensure UI reflects this 3-level hierarchy, prominently highlights mandatory review actions, clearly distinguishes calibration stability from strict held-out metrics, and highlights Naive OR (79.05% BalAcc) vs Consensus (76.42% BalAcc) trade-offs.
+  5. Run complete end-to-end product readiness verification across all 4 categories (`bottle`, `cable`, `metal_nut`, `screw`), LRU caching/eviction, and run the complete unit test suite.
+- **Key Implementation & Verification Results:**
+  1. **Strict 3-Level Precedence in `src/app/reporting/report.py`:**
+     - Precedence 1 (`uncertain_human_review`): Evaluated first. Captures borderline score proximity ($|\Delta| < 3.0$), detector disagreements (specialized detector triggers while base PaDiM is nominal), or documented category ambiguities.
+     - Precedence 2 (`candidate_defects`): Evaluated second. Captures strong indications not flagged as uncertain: high margin ($\Delta \ge 5.0$) OR multi-detector consensus ($\Delta \ge 3.0$).
+     - Precedence 3 (`potential_anomalies`): Evaluated third. Captures moderate single-detector activations ($3.0 \le \Delta < 5.0$).
+     - Hardcoded `is_human_confirmed=False` across all algorithmic outputs. Populated actionable review instructions (`🔍 Action Required: ...` / `⚡ Action Required: ...`).
+  2. **Boundary Unit Testing in `tests/unit/test_report.py`:**
+     - Added `test_finding_categorization_boundary_conditions` covering margins $-3.0$, $2.99$, $3.0$, $4.99$, $5.0$, detector disagreements, and corroborated consensus near boundaries.
+     - Proved pairwise disjoint category sets across all tested outputs ($\text{Uncertain} \cap \text{Candidate} = \emptyset$, $\text{Uncertain} \cap \text{Potential} = \emptyset$, $\text{Candidate} \cap \text{Potential} = \emptyset$).
+     - Unit test count expanded to 14 in `test_report.py`.
+  3. **Frontend Dashboard Polish (`frontend/index.html`):**
+     - Aligned inline inspection results and modal view to strictly reflect the 3-level order: Uncertain first, Candidate Defects second, Potential Anomalies third.
+     - Added dedicated Multi-Detector Cable Benchmark Comparison table clearly identifying ⭐ Naive OR as the best binary balanced-accuracy result on this split (79.05% BalAcc, 89.13% recall) and explaining Consensus & Masked (76.42% BalAcc) operational trade-off (cutting false alarms on clean twisted cables and routing ambiguous spikes to human review).
+     - Clearly distinguished Calibration Pool Stability (50 seeds) from Strict Held-Out Evaluation (untouched evaluation split, zero threshold-selection leakage).
+  4. **Product Readiness Verification (`scratch/verify_product_readiness.py`):**
+     - Step 1: Health, dynamic category listing (`bottle`, `cable`, `metal_nut`, `screw`), metadata, benchmark loading, and hybrid KB query verified.
+     - Step 2: Multi-detector cable inspections on clean cable (nominal, 0 false alarms), missing wire (continuity alert, routed to human review), and puncture (high-margin defect detected, score 54.11) verified.
+     - Step 3: Model caching & category switching across all 4 categories verified. Cache bounded at capacity 3, LRU model eviction verified without memory leaks.
+     - Step 4: SQLite persistence and report retrieval verified.
+     - Step 5: Full JSON download export (14,561 bytes) with disclaimer verified.
+  5. **Unit Test Suite:**
+     - **74 / 74 tests passed in 48.38s** across 11 unit test suites.
+- **Preservation Check:** All existing production models and historical benchmark records strictly preserved. Zero tuning against held-out labels.

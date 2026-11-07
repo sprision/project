@@ -193,8 +193,8 @@ class ReportGenerator:
             multi_detector_agreement = (vision.is_anomalous and (has_continuity_note or has_puncture_note)) or (has_continuity_note and has_puncture_note)
 
             # 1. Primary PaDiM Evaluation
+            # Precedence 1: Uncertain / Human Review (|margin| < 3.0)
             if is_borderline:
-                # Rule: Borderline proximity (|margin| < 3.0) is ALWAYS Uncertain Human Review (never defect)
                 add_finding(
                     finding_id=f"padim_borderline_{vision.image_id}",
                     category="uncertain_human_review",
@@ -212,8 +212,8 @@ class ReportGenerator:
                     ),
                 )
             elif vision.is_anomalous:
+                # Precedence 2: Candidate Defect (margin >= 5.0 or multi-detector corroboration)
                 if margin >= 5.0 or multi_detector_agreement:
-                    # Rule: High-margin (margin >= 5.0) or multi-detector consensus -> Candidate Defect
                     add_finding(
                         finding_id=f"padim_candidate_{vision.image_id}",
                         category="candidate_defects",
@@ -227,8 +227,8 @@ class ReportGenerator:
                         ),
                         action_required="Action Required: Visually inspect candidate defect region(s) against acceptance limits.",
                     )
+                # Precedence 3: Potential Anomaly (3.0 <= margin < 5.0 single detector)
                 else:
-                    # Rule: Moderate non-borderline margin (3.0 <= margin < 5.0) -> Potential Anomaly
                     add_finding(
                         finding_id=f"padim_potential_{vision.image_id}",
                         category="potential_anomalies",
@@ -244,27 +244,79 @@ class ReportGenerator:
                     )
 
             # 2. Specialized Multi-Detector Evidence & Disagreement Resolution
+            # Enforce strict precedence across specialized detectors:
+            # Precedence 1: Uncertain / Human Review (near-boundary or detector disagreement)
+            # Precedence 2: Candidate Defect (high margin or corroborated)
+            # Precedence 3: Potential Anomaly (moderate single-detector indication)
             for note in vision.notes:
                 if "conductor_continuity_detector" in note:
-                    # Conductor continuity failure
-                    category = "candidate_defects" if (margin >= 5.0 or not vision.is_anomalous) else "potential_anomalies"
-                    # If PaDiM was nominal, explain negative anomaly
-                    disagree_prefix = "Detector Disagreement (Negative Anomaly Discovered): " if not vision.is_anomalous else ""
-                    add_finding(
-                        finding_id=f"cont_detector_{vision.image_id}",
-                        category=category,
-                        title=f"{disagree_prefix}Candidate Defect: Wire Harness Conductor Discontinuity",
-                        description=note,
-                        provenance=FindingProvenance(
-                            detector="ConductorContinuityDetector",
-                            threshold=0.50,
-                            location="wire harness divergence",
-                        ),
-                        action_required="Action Required: Count wire branches in divergence channels to confirm missing conductor.",
-                    )
+                    if is_borderline:
+                        add_finding(
+                            finding_id=f"cont_detector_borderline_{vision.image_id}",
+                            category="uncertain_human_review",
+                            title="Uncertain Finding: Conductor Discontinuity Near Decision Boundary",
+                            description=f"Conductor Continuity Detector triggered near decision boundary ({score:.2f} within {abs(margin):.2f} pts of {threshold:.2f}). {note}",
+                            provenance=FindingProvenance(
+                                detector="ConductorContinuityDetector",
+                                threshold=0.50,
+                                location="wire harness divergence",
+                            ),
+                            action_required="Action Required: Secondary physical verification by an inspector is advised.",
+                        )
+                    elif not vision.is_anomalous:
+                        add_finding(
+                            finding_id=f"cont_detector_disagree_{vision.image_id}",
+                            category="uncertain_human_review",
+                            title="Detector Disagreement (Negative Anomaly Discovered): Wire Harness Conductor Discontinuity",
+                            description=f"Conductor Continuity Detector discovered discontinuity while baseline PaDiM reports nominal surface ({score:.2f} < {threshold:.2f}). {note}",
+                            provenance=FindingProvenance(
+                                detector="ConductorContinuityDetector",
+                                threshold=0.50,
+                                location="wire harness divergence",
+                            ),
+                            action_required="Action Required: Count wire branches in divergence channels to confirm missing conductor.",
+                        )
+                    elif margin >= 5.0 or multi_detector_agreement:
+                        add_finding(
+                            finding_id=f"cont_detector_corroborated_{vision.image_id}",
+                            category="candidate_defects",
+                            title="Candidate Defect: Wire Harness Conductor Discontinuity",
+                            description=note,
+                            provenance=FindingProvenance(
+                                detector="ConductorContinuityDetector",
+                                threshold=0.50,
+                                location="wire harness divergence",
+                            ),
+                            action_required="Action Required: Count wire branches in divergence channels to confirm missing conductor.",
+                        )
+                    else:
+                        add_finding(
+                            finding_id=f"cont_detector_potential_{vision.image_id}",
+                            category="potential_anomalies",
+                            title="Potential Anomaly: Wire Harness Conductor Discontinuity",
+                            description=note,
+                            provenance=FindingProvenance(
+                                detector="ConductorContinuityDetector",
+                                threshold=0.50,
+                                location="wire harness divergence",
+                            ),
+                            action_required="Action Required: Re-inspect wire continuity during next cycle.",
+                        )
                 elif "surface_puncture_detector" in note:
-                    if not vision.is_anomalous:
-                        # Detector disagreement: Puncture detector flagged single spike while PaDiM was nominal
+                    if is_borderline:
+                        add_finding(
+                            finding_id=f"punc_detector_borderline_{vision.image_id}",
+                            category="uncertain_human_review",
+                            title="Uncertain Finding: Localized Puncture Near Decision Boundary",
+                            description=f"Surface Puncture Detector flagged localized patch activation near PaDiM decision boundary ({score:.2f} within {abs(margin):.2f} pts of {threshold:.2f}). {note}",
+                            provenance=FindingProvenance(
+                                detector="SurfacePunctureDetector",
+                                threshold=38.0,
+                                location="cable jacket",
+                            ),
+                            action_required="Action Required: Physically verify highlighted jacket coordinates to rule out edge glints or confirm puncture.",
+                        )
+                    elif not vision.is_anomalous:
                         add_finding(
                             finding_id=f"punc_detector_disagree_{vision.image_id}",
                             category="uncertain_human_review",
@@ -280,7 +332,7 @@ class ReportGenerator:
                             ),
                             action_required="Action Required: Examine highlighted jacket coordinates to rule out natural surface glare or flexure.",
                         )
-                    else:
+                    elif margin >= 5.0 or multi_detector_agreement:
                         add_finding(
                             finding_id=f"punc_detector_corroborated_{vision.image_id}",
                             category="candidate_defects",
@@ -292,6 +344,19 @@ class ReportGenerator:
                                 location="cable jacket",
                             ),
                             action_required="Action Required: Physically probe cable jacket at candidate puncture coordinates.",
+                        )
+                    else:
+                        add_finding(
+                            finding_id=f"punc_detector_potential_{vision.image_id}",
+                            category="potential_anomalies",
+                            title="Potential Anomaly: Localized Surface Flaw",
+                            description=note,
+                            provenance=FindingProvenance(
+                                detector="SurfacePunctureDetector",
+                                threshold=38.0,
+                                location="cable jacket",
+                            ),
+                            action_required="Action Required: Monitor highlighted jacket coordinates on subsequent inspections.",
                         )
 
         # 3. Categorize remaining evidence items without duplicating

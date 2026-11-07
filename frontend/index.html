@@ -556,7 +556,8 @@ a:hover { text-decoration: underline; }
         <div class="grid-2 animate-in delay-1">
           <div class="card">
             <div class="card-header">
-              <div class="card-title"><span class="icon">🎯</span> Model Performance (Evaluation)</div>
+              <div class="card-title"><span class="icon">🎯</span> Benchmark Evaluation (Strict Held-Out MVTec AD)</div>
+              <span class="badge badge-normal" style="font-size:10px">Zero Leakage Split</span>
             </div>
             <div id="ov-perf">
               <p style="color:var(--text-muted);font-size:13px">Loading evaluation results…</p>
@@ -579,7 +580,8 @@ a:hover { text-decoration: underline; }
 
         <div class="card animate-in delay-2" style="margin-top:20px">
           <div class="card-header">
-            <div class="card-title"><span class="icon">📊</span> Calibration Summary</div>
+            <div class="card-title"><span class="icon">📊</span> Calibration Pool Stability & Cutoffs (Apparent Metrics)</div>
+            <span class="badge badge-system" style="font-size:10px">50-Seed Split</span>
           </div>
           <div id="ov-calibration">
             <p style="color:var(--text-muted);font-size:13px">Loading calibration data…</p>
@@ -867,7 +869,10 @@ function renderKnownPerf() {
 
 function renderPerf(data) {
   const container = $('ov-perf');
-  let html = '<table class="data-table"><thead><tr><th>Category</th><th>Image AUROC</th><th>Pixel AUROC</th><th>Performance</th></tr></thead><tbody>';
+  let html = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">
+    Strict Held-Out MVTec AD Evaluation (Untouched Test Split • Zero Threshold-Selection Leakage)
+  </div>`;
+  html += '<table class="data-table"><thead><tr><th>Category</th><th>Image AUROC</th><th>Pixel AUROC</th><th>Performance</th></tr></thead><tbody>';
   (data.results || []).forEach(r => {
     const pct = (r.image_auroc * 100).toFixed(1);
     const color = r.image_auroc >= 0.95 ? 'var(--success)' : r.image_auroc >= 0.85 ? 'var(--warning)' : 'var(--danger)';
@@ -883,6 +888,52 @@ function renderPerf(data) {
     </tr>`;
   });
   html += '</tbody></table>';
+
+  // Add specialized cable inspection comparison table
+  html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--text-primary)">🔬 Specialized Cable Inspection Multi-Detector Benchmark (75 Held-Out Images)</div>
+      <span class="badge badge-system" style="font-size:10px">Seed 42 Untouched Split</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
+      Evaluates ConductorContinuityDetector (negative anomalies) and SurfacePunctureDetector (high-frequency residuals) against baseline PaDiM.
+    </div>
+    <table class="data-table" style="font-size:12px">
+      <thead>
+        <tr>
+          <th>Strategy</th>
+          <th>Sensitivity (Recall)</th>
+          <th>Specificity</th>
+          <th>Balanced Acc.</th>
+          <th>Operational Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600;color:var(--text-primary)">Baseline PaDiM</td>
+          <td class="mono">60.87% (28/46)</td>
+          <td class="mono">82.76% (24/29)</td>
+          <td class="mono">71.81%</td>
+          <td style="color:var(--text-dim);font-size:11px">Misses missing_wire (12.5%) & poke (0%)</td>
+        </tr>
+        <tr style="background:rgba(16,185,129,0.05)">
+          <td style="font-weight:600;color:var(--success)">⭐ Naive OR Multi-Detector</td>
+          <td class="mono" style="color:var(--success);font-weight:600">89.13% (41/46)</td>
+          <td class="mono">68.97% (20/29)</td>
+          <td class="mono" style="color:var(--success);font-weight:700">79.05%</td>
+          <td style="color:var(--success);font-size:11px"><strong>Best binary balanced accuracy</strong> on this split (FPR 31.03%)</td>
+        </tr>
+        <tr style="background:rgba(59,130,246,0.05)">
+          <td style="font-weight:600;color:var(--accent)">Consensus & Masked Inspector</td>
+          <td class="mono" style="color:var(--accent);font-weight:600">80.43% (37/46)</td>
+          <td class="mono">72.41% (21/29)</td>
+          <td class="mono" style="color:var(--accent);font-weight:700">76.42%</td>
+          <td style="color:var(--accent);font-size:11px">Suppresses frame edge glints; routes ambiguous spikes to human review</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
   container.innerHTML = html;
 }
 
@@ -897,7 +948,10 @@ async function loadCalibration() {
 }
 
 function renderCalibData(cats) {
-  let html = '<table class="data-table"><thead><tr><th>Category</th><th>Raw Threshold</th><th>Balanced Acc.</th><th>FPR</th><th>50-Seed Stability</th></tr></thead><tbody>';
+  let html = `<div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">
+    ⚠️ <strong>Calibration Split Metrics</strong> (Threshold Selection Pool • 50% Stratified Split, 50 Seeds). Do not confuse with independent held-out evaluation.
+  </div>`;
+  html += '<table class="data-table"><thead><tr><th>Category</th><th>Calibrated Raw Threshold</th><th>Calib Balanced Acc.</th><th>Calib FPR</th><th>50-Seed Stability (Mean)</th><th>Status</th></tr></thead><tbody>';
   for (const [cat, d] of Object.entries(cats)) {
     const bAcc = d.evaluation_metrics ? d.evaluation_metrics.balanced_accuracy : (d.calibration_metrics ? d.calibration_metrics.balanced_accuracy : 0);
     const fpr = d.evaluation_metrics ? d.evaluation_metrics.false_positive_rate : (d.calibration_metrics ? d.calibration_metrics.false_positive_rate : 0);
@@ -908,6 +962,7 @@ function renderCalibData(cats) {
       <td class="mono" style="color:${bAcc >= 0.9 ? 'var(--success)' : 'var(--warning)'}">${(bAcc*100).toFixed(1)}%</td>
       <td class="mono">${(fpr*100).toFixed(1)}%</td>
       <td class="mono">${(stab*100).toFixed(1)}%</td>
+      <td><span class="badge badge-normal" style="font-size:10px">Calibrated</span></td>
     </tr>`;
   }
   html += '</tbody></table>';
@@ -1156,60 +1211,17 @@ function renderInspectionResults(rep) {
       <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">`;
 
     if (hasStructured) {
-      // Group structured findings by category
+      // Group structured findings with explicit precedence: Uncertain/Review first, then Candidate Defect, then Potential Anomaly
+      const uncertainList = sf.filter(f => f.category === 'uncertain_human_review');
       const candidateList = sf.filter(f => f.category === 'candidate_defects');
       const potentialList = sf.filter(f => f.category === 'potential_anomalies');
-      const uncertainList = sf.filter(f => f.category === 'uncertain_human_review');
 
-      if (candidateList.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-weight:600;font-size:12px;color:var(--danger)">🔴 CANDIDATE VISUAL DEFECTS (${candidateList.length})</div>
-            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Strong Model Indication • Unconfirmed</span>
-          </div>`;
-        candidateList.forEach(f => {
-          const p = f.provenance || {};
-          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
-              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
-              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
-              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
-            </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
-          </div>`;
-        });
-        html += `</div>`;
-      }
-
-      if (potentialList.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-weight:600;font-size:12px;color:var(--warning)">🟡 POTENTIAL ANOMALIES (${potentialList.length})</div>
-            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Single Detector Moderate Indication</span>
-          </div>`;
-        potentialList.forEach(f => {
-          const p = f.provenance || {};
-          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
-              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
-              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
-              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
-            </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
-          </div>`;
-        });
-        html += `</div>`;
-      }
-
+      // Precedence 1: Uncertain Findings (Human Review Required)
       if (uncertainList.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--accent);background:rgba(59,130,246,0.08);border-radius:var(--radius-sm)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-weight:600;font-size:12px;color:var(--accent)">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${uncertainList.length})</div>
-            <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">Borderline / Disagreement Zone</span>
+            <div style="font-weight:700;font-size:12px;color:var(--accent);letter-spacing:0.5px">🔵 UNCERTAIN FINDINGS — HUMAN REVIEW MANDATORY (${uncertainList.length})</div>
+            <span class="badge badge-normal" style="font-size:10px;background:rgba(59,130,246,0.2);color:var(--accent)">Precedence 1 • Disagreement / Borderline</span>
           </div>`;
         uncertainList.forEach(f => {
           const p = f.provenance || {};
@@ -1219,32 +1231,84 @@ function renderInspectionResults(rep) {
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
               <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
               ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--warning);font-family:var(--mono)">Margin: ${p.margin > 0 ? '+' : ''}${p.margin.toFixed(2)}</span>` : ''}
               ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
             </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(59,130,246,0.1);border-radius:var(--radius-xs);font-size:11px;color:#bfdbfe">🔍 ${f.action_required}</div>` : ''}
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#93c5fd">🔍 ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Precedence 2: Candidate Visual Defects
+      if (candidateList.length > 0) {
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--danger);background:rgba(239,68,68,0.08);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:700;font-size:12px;color:var(--danger);letter-spacing:0.5px">🔴 CANDIDATE VISUAL DEFECTS (${candidateList.length})</div>
+            <span class="badge badge-anomaly" style="font-size:10px">Precedence 2 • Strong Model Indication • Unconfirmed</span>
+          </div>`;
+        candidateList.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--danger);font-family:var(--mono)">Margin: +${p.margin.toFixed(2)}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Precedence 3: Potential Anomalies
+      if (potentialList.length > 0) {
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--warning);background:rgba(245,158,11,0.08);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:700;font-size:12px;color:var(--warning);letter-spacing:0.5px">🟡 POTENTIAL ANOMALIES (${potentialList.length})</div>
+            <span class="badge badge-normal" style="font-size:10px;background:rgba(245,158,11,0.2);color:var(--warning)">Precedence 3 • Moderate Single-Detector Indication</span>
+          </div>`;
+        potentialList.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--warning);font-family:var(--mono)">Margin: +${p.margin.toFixed(2)}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
           </div>`;
         });
         html += `</div>`;
       }
     } else {
-      // Fallback for string lists
+      // Fallback for string lists with explicit precedence
+      if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--accent);background:rgba(59,130,246,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS — HUMAN REVIEW MANDATORY (${cf.uncertain_human_review.length})</div>`;
+        cf.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
+        html += `</div>`;
+      }
       const candStrs = cf.candidate_defects || cf.confirmed_visual_defects || [];
       if (candStrs.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrs.length})</div>`;
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--danger);background:rgba(239,68,68,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrs.length})</div>`;
         candStrs.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
       if (cf.potential_anomalies && cf.potential_anomalies.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--warning);background:rgba(245,158,11,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cf.potential_anomalies.length})</div>`;
         cf.potential_anomalies.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
-        html += `</div>`;
-      }
-      if (cf.uncertain_human_review && cf.uncertain_human_review.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cf.uncertain_human_review.length})</div>`;
-        cf.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
     }
@@ -1426,51 +1490,14 @@ function renderFullReport(rep) {
   if (hasStructuredM || hasStringListM) {
     html += `<div class="report-section"><h4><span>⚖️</span> Multi-Detector Decision Support Analysis</h4><div class="card"><div style="display:flex;flex-direction:column;gap:12px">`;
     if (hasStructuredM) {
+      const uncM = sfM.filter(f => f.category === 'uncertain_human_review');
       const candM = sfM.filter(f => f.category === 'candidate_defects');
       const potM = sfM.filter(f => f.category === 'potential_anomalies');
-      const uncM = sfM.filter(f => f.category === 'uncertain_human_review');
 
-      if (candM.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:8px">🔴 CANDIDATE VISUAL DEFECTS (${candM.length}) — Unverified Automated Indication</div>`;
-        candM.forEach(f => {
-          const p = f.provenance || {};
-          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
-              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
-              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
-              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
-            </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
-          </div>`;
-        });
-        html += `</div>`;
-      }
-
-      if (potM.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:8px">🟡 POTENTIAL ANOMALIES (${potM.length}) — Single Detector Indication</div>`;
-        potM.forEach(f => {
-          const p = f.provenance || {};
-          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
-              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
-              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
-              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
-            </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:var(--radius-xs);font-size:11px;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
-          </div>`;
-        });
-        html += `</div>`;
-      }
-
+      // Precedence 1: Uncertain Findings (Human Review Required)
       if (uncM.length > 0) {
-        html += `<div style="padding:12px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:8px">🔵 UNCERTAIN FINDINGS (${uncM.length}) — Human Review Required</div>`;
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--accent);background:rgba(59,130,246,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--accent);margin-bottom:8px">🔵 UNCERTAIN FINDINGS (${uncM.length}) — HUMAN REVIEW MANDATORY (Precedence 1)</div>`;
         uncM.forEach(f => {
           const p = f.provenance || {};
           html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
@@ -1479,31 +1506,80 @@ function renderFullReport(rep) {
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
               <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
               ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--warning);font-family:var(--mono)">Margin: ${p.margin > 0 ? '+' : ''}${p.margin.toFixed(2)}</span>` : ''}
               ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
             </div>
-            ${f.action_required ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(59,130,246,0.1);border-radius:var(--radius-xs);font-size:11px;color:#bfdbfe">🔍 ${f.action_required}</div>` : ''}
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#93c5fd">🔍 ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Precedence 2: Candidate Defects
+      if (candM.length > 0) {
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--danger);background:rgba(239,68,68,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--danger);margin-bottom:8px">🔴 CANDIDATE VISUAL DEFECTS (${candM.length}) — Precedence 2 (Strong Indication • Unconfirmed)</div>`;
+        candM.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--danger);font-family:var(--mono)">Margin: +${p.margin.toFixed(2)}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#fca5a5">⚡ ${f.action_required}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+
+      // Precedence 3: Potential Anomalies
+      if (potM.length > 0) {
+        html += `<div style="padding:14px 16px;border-left:4px solid var(--warning);background:rgba(245,158,11,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--warning);margin-bottom:8px">🟡 POTENTIAL ANOMALIES (${potM.length}) — Precedence 3 (Moderate Single Detector)</div>`;
+        potM.forEach(f => {
+          const p = f.provenance || {};
+          html += `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary)">${f.title}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${f.description}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:11px">
+              <span class="badge badge-system" style="font-size:10px">Detector: ${p.detector || 'System'}</span>
+              ${p.score != null ? `<span style="color:var(--text-dim);font-family:var(--mono)">Score: ${p.score.toFixed(2)} vs Cutoff ${p.threshold ? p.threshold.toFixed(2) : 'n/a'}</span>` : ''}
+              ${p.margin != null ? `<span style="color:var(--warning);font-family:var(--mono)">Margin: +${p.margin.toFixed(2)}</span>` : ''}
+              ${p.location ? `<span style="color:var(--accent);font-family:var(--mono)">📍 ${p.location}</span>` : ''}
+              <span style="font-size:10px;color:var(--text-dim);font-family:var(--mono)">[Unconfirmed Hypothesis]</span>
+            </div>
+            ${f.action_required ? `<div style="margin-top:6px;padding:8px 12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:#fde68a">⚡ ${f.action_required}</div>` : ''}
           </div>`;
         });
         html += `</div>`;
       }
     } else {
+      if (cfM.uncertain_human_review && cfM.uncertain_human_review.length) {
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--accent);background:rgba(59,130,246,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (${cfM.uncertain_human_review.length}) — HUMAN REVIEW MANDATORY</div>`;
+        cfM.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
+        html += `</div>`;
+      }
       const candStrsM = cfM.candidate_defects || cfM.confirmed_visual_defects || [];
       if (candStrsM.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--danger);background:rgba(239,68,68,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrsM.length})</div>`;
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--danger);background:rgba(239,68,68,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--danger);margin-bottom:6px">🔴 CANDIDATE VISUAL DEFECTS (${candStrsM.length})</div>`;
         candStrsM.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
       if (cfM.potential_anomalies && cfM.potential_anomalies.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--warning);background:rgba(245,158,11,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cfM.potential_anomalies.length})</div>`;
+        html += `<div style="padding:12px 14px;border-left:4px solid var(--warning);background:rgba(245,158,11,0.08);border-radius:var(--radius-sm)">
+          <div style="font-weight:700;font-size:12px;color:var(--warning);margin-bottom:6px">🟡 POTENTIAL ANOMALIES (${cfM.potential_anomalies.length})</div>`;
         cfM.potential_anomalies.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
         html += `</div>`;
       }
-      if (cfM.uncertain_human_review && cfM.uncertain_human_review.length) {
-        html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:rgba(59,130,246,0.06);border-radius:var(--radius-sm)">
-          <div style="font-weight:600;font-size:12px;color:var(--accent);margin-bottom:6px">🔵 UNCERTAIN FINDINGS (HUMAN REVIEW REQUIRED) (${cfM.uncertain_human_review.length})</div>`;
-        cfM.uncertain_human_review.forEach(s => { html += `<div style="font-size:13px;color:var(--text-primary);margin-bottom:4px">• ${s}</div>`; });
+    }
         html += `</div>`;
       }
     }

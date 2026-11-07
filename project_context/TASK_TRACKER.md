@@ -17,6 +17,30 @@
   - Resolved Hugging Face Hub offline retry latency in `src/app/retrieval/retriever.py` by configuring `local_files_only=True` with graceful online fallback.
   - Verified dense embeddings (MiniLM-L6-v2) + lexical BM25Plus retrieval in 17.7s cold / <1s warm.
 
+- [x] **Final Decision Logic & Product Readiness Pass**
+  - **Explicit 3-Level Precedence Enforcement in `src/app/reporting/report.py`:**
+    - Level 1 (`uncertain_human_review`) evaluated first: triggers on borderline proximity ($|\Delta| < 3.0$) OR detector disagreement (e.g. specialized detector trigger while PaDiM is nominal).
+    - Level 2 (`candidate_defects`) evaluated second: triggers on high margin ($\Delta \ge 5.0$) OR multi-detector corroborated consensus ($\Delta \ge 3.0$), provided Level 1 did not trigger.
+    - Level 3 (`potential_anomalies`) evaluated third: captures remaining single-detector moderate activations ($3.0 \le \Delta < 5.0$).
+    - Pairwise disjoint sets: strictly enforced so no finding can belong to multiple categories.
+    - Hardcoded `is_human_confirmed=False` across all algorithmic outputs; attached specific action instructions (`🔍 Action Required: ...` or `⚡ Action Required: ...`).
+  - **Comprehensive Boundary Condition Unit Testing (`tests/unit/test_report.py`):**
+    - Added `test_finding_categorization_boundary_conditions` testing score margins $-3.0$, $2.99$ (just below 3.0), $3.0$, $4.99$ (just below 5.0), and $5.0$.
+    - Tested detector disagreement cases and corroborated findings near uncertainty boundaries.
+    - Verified strict mutual exclusivity ($\text{Uncertain} \cap \text{Candidate} = \emptyset$, $\text{Uncertain} \cap \text{Potential} = \emptyset$, $\text{Candidate} \cap \text{Potential} = \emptyset$).
+  - **Evaluation Integrity & Dashboard Reporting (`frontend/index.html`):**
+    - Preserved all historical benchmark artifacts and model files untouched.
+    - Added dedicated Cable Benchmark Comparison Table in UI contrasting:
+      - Baseline PaDiM: 60.87% Sens / 82.76% Spec / 71.81% BalAcc
+      - ⭐ Naive OR: **89.13% Sens / 68.97% Spec / 79.05% BalAcc** (highlighted as best binary balanced accuracy on this split)
+      - Consensus & Masked: **80.43% Sens / 72.41% Spec / 76.42% BalAcc** (explained operational trade-off: suppresses edge glints and routes ambiguous spikes to human review).
+    - Reordered inspection findings display order to match 3-level precedence: Uncertain (1st), Candidate Defects (2nd), Potential Anomalies (3rd).
+  - **End-to-End Product Readiness Verification (`scratch/verify_product_readiness.py`):**
+    - Verified dynamic model registry with LRU caching (capacity = 3) and eviction on 4 categories (`bottle`, `cable`, `metal_nut`, `screw`).
+    - Verified real inspections on clean cable, missing wire, puncture, bottle, metal nut, screw.
+    - Verified SQLite persistence, report detail retrieval, and JSON export serialization (14,561 bytes) with disclaimer.
+  - **Full Unit Test Suite:** **74 / 74 tests passed in 48.38s**.
+
 - [x] **Specialized Multi-Detector Cable Inspection Module & Finding Categorization**
   - Investigated root causes of low baseline PaDiM cable sensitivity:
     - Missing wire (mean score 21.74 vs clean 22.77) matches background Gaussian distribution (negative anomaly problem).

@@ -221,3 +221,141 @@ def test_evidence_provenance_and_human_unconfirmed(tmp_workspace):
         assert "Confirmed Physical Defect" not in sf.title
 
 
+def test_finding_categorization_boundary_conditions(tmp_workspace):
+    """Verify strict precedence and exact boundary conditions across:
+    - margin -3.0
+    - margin just below 3.0 (2.99)
+    - margin 3.0
+    - margin just below 5.0 (4.99)
+    - margin 5.0
+    - corroborated findings near uncertainty boundary
+    - detector disagreement cases
+    """
+    threshold = 30.42
+    rep_gen = ReportGenerator()
+
+    # 1. Margin = -3.0 (nominal side, |m| = 3.0 is not < 3.0)
+    # 1a. Clean sample with m = -3.0
+    v_m3 = VisionResult(
+        image_id="cable_m3", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.20, raw_anomaly_score=threshold - 3.0,  # 27.42
+        is_anomalous=False, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_m3 = rep_gen.generate("cable_m3", "defect?", v_m3, None, [], [])
+    assert r_m3.vision.is_anomalous is False
+    assert len(r_m3.categorized_findings["candidate_defects"]) == 0
+    assert len(r_m3.categorized_findings["potential_anomalies"]) == 0
+    assert len(r_m3.categorized_findings["uncertain_human_review"]) == 0
+
+    # 1b. Margin = -3.0 with detector disagreement (puncture triggered while PaDiM is nominal)
+    v_m3_disagree = VisionResult(
+        image_id="cable_m3_disagree", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.20, raw_anomaly_score=threshold - 3.0,
+        is_anomalous=False, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'surface_puncture_detector' detected surface puncture (score 41.50 >= 38.00)."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_m3_disagree = rep_gen.generate("cable_m3_disagree", "defect?", v_m3_disagree, None, [], [])
+    # Precedence 1: Detector disagreement routes strictly to uncertain_human_review
+    unc_m3 = [f for f in r_m3_disagree.structured_findings if f.category == "uncertain_human_review"]
+    assert len(unc_m3) == 1
+    assert "Detector Disagreement" in unc_m3[0].title
+    assert unc_m3[0].is_human_confirmed is False
+
+    # 2. Margin = just below 3.0 (m = +2.99, |m| < 3.0 -> uncertainty boundary band)
+    # 2a. Uncorroborated single detector
+    v_below3 = VisionResult(
+        image_id="cable_below3", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.55, raw_anomaly_score=threshold + 2.99,  # 33.41
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_below3 = rep_gen.generate("cable_below3", "defect?", v_below3, None, [], [])
+    # Precedence 1: Borderline proximity routes to uncertain_human_review
+    unc_below3 = [f for f in r_below3.structured_findings if f.category == "uncertain_human_review"]
+    assert len(unc_below3) >= 1
+    assert any("Borderline Score Proximity" in f.title for f in unc_below3)
+    assert len(r_below3.categorized_findings["candidate_defects"]) == 0
+    assert len(r_below3.categorized_findings["potential_anomalies"]) == 0
+
+    # 2b. Corroborated near uncertainty boundary (m = +2.99 with puncture detector)
+    v_below3_corroborated = VisionResult(
+        image_id="cable_below3_corr", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.55, raw_anomaly_score=threshold + 2.99,
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'surface_puncture_detector' detected surface puncture (score 40.00 >= 38.00)."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_below3_corr = rep_gen.generate("cable_below3_corr", "defect?", v_below3_corroborated, None, [], [])
+    # Precedence 1: Near uncertainty boundary takes precedence over candidate defect!
+    unc_corr = [f for f in r_below3_corr.structured_findings if f.category == "uncertain_human_review"]
+    assert len(unc_corr) >= 1
+    assert any("Uncertain Finding" in f.title or "Borderline" in f.title for f in unc_corr)
+    assert all(f.is_human_confirmed is False for f in r_below3_corr.structured_findings)
+
+    # 3. Margin = 3.0 (m = +3.00, |m| < 3.0 is False)
+    # 3a. Uncorroborated single detector -> potential_anomalies
+    v_3_single = VisionResult(
+        image_id="cable_3_single", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.60, raw_anomaly_score=threshold + 3.0,  # 33.42
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_3_single = rep_gen.generate("cable_3_single", "defect?", v_3_single, None, [], [])
+    assert len(r_3_single.categorized_findings["potential_anomalies"]) >= 1
+    assert len(r_3_single.categorized_findings["candidate_defects"]) == 0
+    assert len(r_3_single.categorized_findings["uncertain_human_review"]) == 0
+
+    # 3b. Corroborated at m = 3.0 -> candidate_defects
+    v_3_corr = VisionResult(
+        image_id="cable_3_corr", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.60, raw_anomaly_score=threshold + 3.0,
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'surface_puncture_detector' detected surface puncture (score 42.00 >= 38.00)."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_3_corr = rep_gen.generate("cable_3_corr", "defect?", v_3_corr, None, [], [])
+    assert len(r_3_corr.categorized_findings["candidate_defects"]) >= 1
+    assert all(f.is_human_confirmed is False for f in r_3_corr.structured_findings)
+
+    # 4. Margin = just below 5.0 (m = +4.99)
+    # 4a. Uncorroborated single detector -> potential_anomalies
+    v_below5_single = VisionResult(
+        image_id="cable_below5", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.70, raw_anomaly_score=threshold + 4.99,  # 35.41
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_below5_single = rep_gen.generate("cable_below5", "defect?", v_below5_single, None, [], [])
+    assert len(r_below5_single.categorized_findings["potential_anomalies"]) >= 1
+    assert len(r_below5_single.categorized_findings["candidate_defects"]) == 0
+
+    # 4b. Corroborated at m = 4.99 -> candidate_defects
+    v_below5_corr = VisionResult(
+        image_id="cable_below5_corr", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.70, raw_anomaly_score=threshold + 4.99,
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        notes=["Specialized detector 'conductor_continuity_detector' detected conductor continuity failure in right."],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_below5_corr = rep_gen.generate("cable_below5_corr", "defect?", v_below5_corr, None, [], [])
+    assert len(r_below5_corr.categorized_findings["candidate_defects"]) >= 1
+
+    # 5. Margin = 5.0 (m = +5.00, high margin -> candidate_defects even if uncorroborated)
+    v_5_single = VisionResult(
+        image_id="cable_5", category="cable", model_name="PaDiM", backbone="resnet18",
+        image_anomaly_score=0.75, raw_anomaly_score=threshold + 5.0,  # 35.42
+        is_anomalous=True, threshold=threshold, verdict_mode="calibrated_raw", regions=[],
+        quality=ImageQuality(is_valid=True, width=64, height=64))
+    r_5 = rep_gen.generate("cable_5", "defect?", v_5_single, None, [], [])
+    assert len(r_5.categorized_findings["candidate_defects"]) >= 1
+    assert len(r_5.categorized_findings["potential_anomalies"]) == 0
+    assert len(r_5.categorized_findings["uncertain_human_review"]) == 0
+
+    # Verify mutual exclusivity across all tested reports
+    for rep in [r_m3, r_m3_disagree, r_below3, r_below3_corr, r_3_single, r_3_corr, r_below5_single, r_below5_corr, r_5]:
+        cats_by_id = {}
+        for sf in rep.structured_findings:
+            cats_by_id.setdefault(sf.category, set()).add(sf.id)
+            assert sf.is_human_confirmed is False
+        cat_keys = list(cats_by_id.keys())
+        for i in range(len(cat_keys)):
+            for j in range(i + 1, len(cat_keys)):
+                k1, k2 = cat_keys[i], cat_keys[j]
+                assert cats_by_id[k1].isdisjoint(cats_by_id[k2]), f"Collision between {k1} and {k2}"
+
+
+

@@ -158,4 +158,41 @@ To transition from the initial 3-category baseline (`bottle`, `cable`, `metal_nu
    - `scripts.download_mvtec` -> `scripts.fit_padim` -> `scripts.calibrate_thresholds` -> `scripts.evaluate_cv` -> `scripts.validate_anomaly_detection`.
 4. **Knowledge Base Parity:** New categories register corresponding technical inspection guidelines into `data/kb/` so agent retrieval citations remain grounded.
 
+---
+
+## Decision Logic Precedence & Finding Taxonomy
+
+The system enforces a strict 3-level evaluation order for finding categorization:
+
+```
+                      [ Incoming Finding / Detector Signal ]
+                                         │
+                                         ▼
+                 ┌───────────────────────────────────────────────┐
+                 │  Precedence 1: Uncertain / Human Review ?     │
+                 │  - Borderline margin: |margin| < 3.0          │
+                 │  - Detector disagreement (e.g. specialized   │
+                 │    detector trigger vs nominal PaDiM)         │
+                 └───────────────────────┬───────────────────────┘
+                                         │
+                         YES ────────────┴──────────── NO
+                          │                            │
+                          ▼                            ▼
+             [ uncertain_human_review ]   ┌───────────────────────────────────────────────┐
+             (Action: Mandatory Review)   │  Precedence 2: Candidate Visual Defect ?      │
+                                          │  - High margin: margin >= 5.0                 │
+                                          │  - Multi-detector consensus: margin >= 3.0    │
+                                          └───────────────────────┬───────────────────────┘
+                                                                  │
+                                                  YES ────────────┴──────────── NO
+                                                   │                            │
+                                                   ▼                            ▼
+                                        [ candidate_defects ]       [ potential_anomalies ]
+                                        (Action: Visual Triage)     (Action: Operational Monitor)
+```
+
+- **Safety Guarantee:** Uncertain findings always take precedence over candidate defects and potential anomalies.
+- **Mutual Exclusivity:** The three categories are pairwise disjoint subsets ($\text{Uncertain} \cap \text{Candidate} = \emptyset$, $\text{Uncertain} \cap \text{Potential} = \emptyset$, $\text{Candidate} \cap \text{Potential} = \emptyset$).
+- **Authority Boundary:** All algorithmically generated findings set `is_human_confirmed: bool = False` to prevent automated defect certifications without qualified human review.
+
 

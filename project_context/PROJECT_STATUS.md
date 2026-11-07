@@ -115,24 +115,28 @@
   - Persistent global authority notice banner establishing decision-support boundaries (not an autonomous quality authority).
   - Explicit non-probabilistic score presentation: raw Mahalanobis distances and threshold margins clearly explained.
   - Multi-detector finding categorization with strict mutual exclusivity, duplicate prevention, and detector provenance tracking (`FindingProvenance`, `CategorizedFinding`).
-  - Tripartite finding classification across report schemas and dashboard:
-    1. 🔴 *Candidate Visual Defects* (Strong Model Indication • Unconfirmed)
-    2. 🟡 *Potential Anomalies* (Single Detector Moderate Indication)
-    3. 🔵 *Uncertain Findings* (Borderline / Disagreement • Human Review Required)
+  - Tripartite finding classification with strict 3-level precedence order:
+    1. 🔵 *Uncertain Findings — Human Review Mandatory* (Borderline Proximity $|\Delta| < 3.0$ or Detector Disagreement) — evaluated first
+    2. 🔴 *Candidate Visual Defects* (Strong Model Indication • $\Delta \ge 5.0$ or Corroborated Consensus) — evaluated second
+    3. 🟡 *Potential Anomalies* (Single Detector Moderate Indication • $3.0 \le \Delta < 5.0$) — evaluated third
+  - UI order and report JSON strictly reflect this precedence hierarchy with dedicated action directives (`🔍 Action Required: ...` / `⚡ Action Required: ...`).
+  - Added dedicated Multi-Detector Cable Benchmark Comparison table in frontend contrasting Baseline PaDiM (71.81% BalAcc), ⭐ Naive OR (79.05% BalAcc, 89.13% Sens — best binary balanced accuracy on this split), and Consensus & Masked (76.42% BalAcc — reducing scrap orders and routing ambiguous spikes to human review).
+  - Explicit non-probabilistic score presentation: raw Mahalanobis distances and threshold margins clearly explained.
+  - Multi-detector finding categorization with strict mutual exclusivity, duplicate prevention, and detector provenance tracking (`FindingProvenance`, `CategorizedFinding`).
   - Explicit actionable recommendations attached to human review items.
-  - Category benchmark reliability pills (`bottle`: high, `metal_nut`: high, `cable`: moderate with documented overlap).
+  - Category benchmark reliability pills (`bottle`: high, `metal_nut`: high, `screw`: high pixel / low image, `cable`: moderate with documented overlap).
   - Automated borderline score warning cards ($|raw - threshold| < 3.0$) mandating secondary human visual review.
   - Category-specific limitation alerts for cable geometry overlap and metal nut boundary edge reflections.
 
 ### 9. Test Suite Verification
-- **Status:** 73 / 73 passing unit tests across all 11 test suites (43.35s runtime):
+- **Status:** 74 / 74 passing unit tests across all 11 test suites (48.38s runtime):
   - `test_schemas.py`: 4 passed
   - `test_db.py`: 2 passed
   - `test_ingest.py`: 5 passed
   - `test_model_registry.py`: 8 passed (LRU cache accounting, eviction order, production discovery, memory reporting)
   - `test_patchcore.py`: 4 passed (initialization, embedding shapes, fit memory bank, anomaly map, save/load cycle)
   - `test_cable_inspector.py`: 6 passed (conductor continuity detector, surface puncture detector, composite inspection, finding categorization)
-  - `test_report.py`: 13 passed (regression tests for dict retrieval, borderline score warnings, category limitations, category mutual exclusivity, detector disagreement handling, duplicate prevention, evidence provenance, and unconfirmed physical defect distinction)
+  - `test_report.py`: 14 passed (regression tests for dict retrieval, borderline score warnings, category limitations, category mutual exclusivity, detector disagreement handling, duplicate prevention, evidence provenance, unconfirmed physical defect distinction, and 5-point boundary condition tests: -3.0, 2.99, 3.0, 4.99, 5.0)
   - `test_vision_validation.py`: 5 passed
   - `test_threshold_calibration.py`: 12 passed (disjoint split verification, certified sample counts, calibrated threshold presence, metric arithmetic, seeded reproducibility)
   - `test_retriever.py`: 4 passed

@@ -105,5 +105,18 @@
     3. On calibration data, this policy cuts false alarms in half (FPR $27.59\% \to 13.79\%$), increases specificity to $86.21\%$, and improves balanced accuracy to $85.49\%$.
 - **Latency Profile:** Measured end-to-end composite pipeline latency is ~390 ms (PaDiM: 154 ms, Continuity: 74 ms, Puncture: 98 ms, Retrieval: 14 ms, DB: 0.6 ms, Report synthesis: 0.1 ms).
 
+---
+
+### 12. Decision Precedence Order & Deterministic Boundary Partitioning
+- **Decision:** Enforce an explicit 3-level evaluation order in `src/app/reporting/report.py` when sorting findings into categories:
+  1. **Precedence 1 (`uncertain_human_review`):** Evaluated first. Captures any finding with borderline margin ($|\Delta| < 3.0$), detector disagreement (specialized detector triggers while PaDiM is nominal), or documented category ambiguity.
+  2. **Precedence 2 (`candidate_defects`):** Evaluated second. Captures findings not flagged as uncertain that exhibit strong evidence: high margin ($\Delta \ge 5.0$) OR multi-detector corroboration with $\Delta \ge 3.0$.
+  3. **Precedence 3 (`potential_anomalies`):** Evaluated third. Captures all remaining uncorroborated single-detector findings in the moderate margin band ($3.0 \le \Delta < 5.0$).
+- **Rationale:**
+  - Prevents subtle race conditions where a finding near the threshold boundary ($|\Delta| < 3.0$) could be miscategorized as a candidate defect merely because multi-detector corroboration occurred.
+  - Guarantees pairwise disjoint subsets: $\text{Uncertain} \cap \text{Candidate} = \emptyset$, $\text{Uncertain} \cap \text{Potential} = \emptyset$, $\text{Candidate} \cap \text{Potential} = \emptyset$.
+  - Ensures human safety: uncertain findings always take priority in triage and cannot be eclipsed by candidate defect claims.
+  - Algorithmic predictions always retain `is_human_confirmed: bool = False`.
+
 
 
